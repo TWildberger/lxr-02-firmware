@@ -270,6 +270,9 @@ enum NamesEnum
 	TEXT_FX_P3,
 	TEXT_FX_P4,
 	TEXT_PATTERN_MODE,
+	TEXT_SYSEX_ENABLE,
+	TEXT_SYSEX_DEVICE_ID,
+	TEXT_SYSEX_ECHO,
 
 
 	NUM_NAMES
@@ -379,8 +382,10 @@ enum shortNamesEnum
 	SHORT_P4,
 	SHORT_KCM,
 	SHORT_FLAM,
-	SHORT_SHIFT
-
+	SHORT_SHIFT,
+	SHORT_SYSEX,
+	SHORT_DEVICE_ID,
+	SHORT_ECHO
 	
 };
 //-----------------------------------------------------------------
@@ -508,7 +513,10 @@ enum longNamesEnum
 	LONG_P4,
 	LONG_PATTERN_MODE,
 	LONG_FLAM,
-	LONG_SHIFT
+	LONG_SHIFT,
+	LONG_SYSEX,
+	LONG_DEVICE_ID,
+	LONG_ECHO
 	
 };
 

@@ -963,6 +963,18 @@ FRESULT preset_saveGlobals()
 #endif	
 }
 //----------------------------------------------------
+// Older glo.cfg files are shorter, and older .all files have 0xFF padding where
+// the SysEx globals now live, so fall back to defaults for anything out of range.
+static void preset_sanitizeSysexGlobals(uint8_t forceDefaults)
+{
+	if(forceDefaults || activeParameters[PAR_SYSEX_ENABLE] > 1)
+		activeParameters[PAR_SYSEX_ENABLE] = 1;
+	if(forceDefaults || activeParameters[PAR_SYSEX_DEVICE_ID] < 1 || activeParameters[PAR_SYSEX_DEVICE_ID] > 16)
+		activeParameters[PAR_SYSEX_DEVICE_ID] = 1;
+	if(forceDefaults || activeParameters[PAR_SYSEX_ECHO] > 1)
+		activeParameters[PAR_SYSEX_ECHO] = 0;
+}
+//----------------------------------------------------
 // returns 1 on success
 static uint8_t preset_readGlobalData()
 {
@@ -981,9 +993,12 @@ static uint8_t preset_readGlobalData()
 	return 1;
 #else
 	const uint8_t numGlobals = NUM_PARAMS - PAR_BEGINNING_OF_GLOBALS;
+	// stock v1.7 files only contain the globals up to PAR_PATTERN_MODE
+	const uint8_t numLegacyGlobals = PAR_SYSEX_ENABLE - PAR_BEGINNING_OF_GLOBALS;
 	f_read((FIL*)&SDFile,&activeParameters[PAR_BEGINNING_OF_GLOBALS],numGlobals,&bytesRead);
-	if(bytesRead != numGlobals)	return 0;
-	else return 1;
+	if(bytesRead < numLegacyGlobals) return 0;
+	preset_sanitizeSysexGlobals(bytesRead < numGlobals);
+	return 1;
 
 #endif
 #endif
@@ -1067,6 +1082,10 @@ void preset_loadDefaultGlobals()
 	activeParameters[PAR_MIDI_CHAN_GLOBAL] = 0; //all
 
 	activeParameters[PAR_PATTERN_MODE] = 1; //auto
+
+	activeParameters[PAR_SYSEX_ENABLE] = 1;
+	activeParameters[PAR_SYSEX_DEVICE_ID] = 1;
+	activeParameters[PAR_SYSEX_ECHO] = 0;
 
 }
 //----------------------------------------------------
