@@ -345,12 +345,12 @@ uint8_t parameterOrder[END_OF_SOUND_PARAMETERS] = {
 	PAR_AUDIO_OUT6,						/*220*/
 
 //ATTENTION these were MIDI_NOTE_x and still appear as dummies in the mod target array!
-	PAR_UNUSED_1,
-	PAR_UNUSED_2,
-	PAR_UNUSED_3,
-	PAR_UNUSED_4,
-	PAR_UNUSED_5,
-	PAR_UNUSED_6,
+	PAR_ENGINE_1,
+	PAR_ENGINE_2,
+	PAR_ENGINE_3,
+	PAR_TIMBRE_DECAY_1,
+	PAR_TIMBRE_DECAY_2,
+	PAR_TIMBRE_DECAY_3,
 	PAR_UNUSED_7,
 
 

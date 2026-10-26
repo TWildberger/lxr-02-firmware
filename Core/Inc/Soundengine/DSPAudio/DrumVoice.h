@@ -27,6 +27,7 @@
 #include "Soundengine/DSPAudio/transientGenerator.h"
 #include "Soundengine/DSPAudio/snapEg.h"
 #include "Soundengine/DSPAudio/dither.h"
+#include "Soundengine/DSPAudio/FeedbackFm.h"
 //------------------------------------------------------------------------
 enum
 {
@@ -93,6 +94,8 @@ typedef struct VoiceStruct
 #endif
 
 	float pwm;
+	uint8_t engine;
+	FeedbackFm feedbackFm;
 } DrumVoice;
 //------------------------------------------------------------------------
 

@@ -173,6 +173,8 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_ROTATION, CAT_EUKLID, LONG_ROTATION}, 		//TEXT_ROTATION
 		{SHORT_FLAM, CAT_STEP, LONG_FLAM}, 		//TEXT_FLAM
 		{SHORT_SHIFT, CAT_STEP, LONG_SHIFT}, 		//TEXT_SHIFT
+		{SHORT_CONDITION, CAT_STEP, LONG_CONDITION}, 	//TEXT_STEP_CONDITION
+		{SHORT_BEAT_REPEAT, CAT_PATTERN, LONG_BEAT_REPEAT}, //TEXT_BEAT_REPEAT
 
 
 		{SHORT_BPM,CAT_GLOBAL,LONG_TEMPO},					//TEXT_BPM
@@ -262,6 +264,8 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_MIXER, CAT_CPU, LONG_MIXER},			/*TEXT_CPU_MIXER*/
 		{SHORT_FX, CAT_CPU, LONG_FX},				/*TEXT_CPU_FX*/
 		{SHORT_XRUNS, CAT_CPU, LONG_XRUNS},			/*TEXT_CPU_XRUNS*/
+		{SHORT_ENGINE, CAT_OSC, LONG_ENGINE},
+		{SHORT_TIMBRE_DECAY, CAT_OSC, LONG_TIMBRE_DECAY},
 
 
 };
@@ -491,12 +495,12 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 	    /*PAR_AUDIO_OUT5*/ 		DTYPE_MENU | (MENU_AUDIO_OUT<<8),
 	    /*PAR_AUDIO_OUT6*/ 		DTYPE_MENU | (MENU_AUDIO_OUT<<8),		//220
 	    // these 7
-	    /*PAR_UNUSED1*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED2*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED3*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED4*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED5*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED6*/		DTYPE_NOTE_NAME,
+	    /*PAR_ENGINE_1*/		DTYPE_MENU | (MENU_DRUM_ENGINE<<8),
+	    /*PAR_ENGINE_2*/		DTYPE_MENU | (MENU_DRUM_ENGINE<<8),
+	    /*PAR_ENGINE_3*/		DTYPE_MENU | (MENU_DRUM_ENGINE<<8),
+	    /*PAR_TIMBRE_DECAY_1*/	DTYPE_0B127,
+	    /*PAR_TIMBRE_DECAY_2*/	DTYPE_0B127,
+	    /*PAR_TIMBRE_DECAY_3*/	DTYPE_0B127,
 	    /*PAR_UNUSED7*/		DTYPE_NOTE_NAME,
 
 		/*PAR_PWM_1,*/			DTYPE_0B127,
@@ -537,8 +541,8 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 	    /*PAR_P1_VAL*/ 			DTYPE_0B127,							//240
 	    /*PAR_P2_VAL*/ 			DTYPE_0B127,
 	    /*PAR_SHUFFLE*/ 		DTYPE_0B127,
-	    /*PAR_UNUSED*/ 			DTYPE_0B127,
-	    /*PAR_PATTERN_NEXT*/ 	DTYPE_MENU | (MENU_NEXT_PATTERN<<8),
+	    /*PAR_UNUSED*/ 			DTYPE_MENU | (MENU_STEP_CONDITION<<8),
+	    /*PAR_PATTERN_NEXT*/ 	DTYPE_MENU | (MENU_BEAT_REPEAT<<8),
 	    /*PAR_TRACK_LENGTH*/ 	DTYPE_1B64,
 	    /*PAR_GLO_SAT*/			DTYPE_0B127,
 	    /*PAR_POS_Y*/ 			DTYPE_0B127,
@@ -2673,6 +2677,8 @@ static uint8_t getMaxEntriesForMenu(uint8_t menuId)
 
 	case MENU_FX:
 		return fxNames[0][0];
+	case MENU_DRUM_ENGINE:
+		return drumEngineNames[0][0];
 
 	case MENU_DIST:
 		return distNames[0][0];
@@ -2694,6 +2700,10 @@ static uint8_t getMaxEntriesForMenu(uint8_t menuId)
 
 	case MENU_STEP_SHIFT:
 			return stepShiftNames[0][0];
+	case MENU_STEP_CONDITION:
+		return stepConditionNames[0][0];
+	case MENU_BEAT_REPEAT:
+		return beatRepeatNames[0][0];
 
 	default:
 		return 0;
@@ -2774,6 +2784,9 @@ static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmV
 	case MENU_FX:
 		p=fxNames[curParmVal+1];
 		break;
+	case MENU_DRUM_ENGINE:
+		p=drumEngineNames[curParmVal+1];
+		break;
 
 	case MENU_DIST:
 		p=distNames[curParmVal+1];
@@ -2801,6 +2814,12 @@ static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmV
 
 	case MENU_STEP_SHIFT:
 		p=stepShiftNames[curParmVal+1];
+		break;
+	case MENU_STEP_CONDITION:
+		p=stepConditionNames[curParmVal+1];
+		break;
+	case MENU_BEAT_REPEAT:
+		p=beatRepeatNames[curParmVal+1];
 		break;
 
 
@@ -3571,6 +3590,10 @@ void menu_parseGlobalParam(uint16_t paramNr, uint8_t value)
 
 	case PAR_SHUFFLE:
 		frontPanel_sendData(SEQ_CC,SEQ_SHUFFLE,value);
+		break;
+
+	case PAR_UNUSED:
+		frontPanel_sendData(SEQ_CC, SEQ_STEP_CONDITION, value);
 		break;
 
 	case PAR_AUTOM_TRACK:

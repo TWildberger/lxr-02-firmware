@@ -409,6 +409,11 @@ void frontPanel_parseData(uint8_t data)
 							menu_repaintAll();
 							break;
 
+						case SEQ_STEP_CONDITION:
+							activeParameters[PAR_UNUSED] = frontParser_midiMsg.data2;
+							menu_repaintAll();
+							break;
+
 						/*
 						case SEQ_GET_ACTIVE_PAT:
 						//only in mute mode relevant

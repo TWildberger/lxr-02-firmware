@@ -89,7 +89,7 @@ stock CC/NRPN mapping is unchanged. A configurable MIDI note is in the
 `FX_FREEZE` (`46`), payload one u7 value as in the table above. There is no
 reply on success, so it can be sent from a pad or key with low latency. If the
 FX type is not `frz`, the device answers `NAK(46, ERR_RANGE, fx type)`. See
-[sysex.md §5.17](sysex.md#517-fx_freeze-46).
+[sysex.md §5.19](sysex.md#519-fx_freeze-46).
 
 ```
 F0 7D 4C 7F 01 46 05 3D F7     engage at 1/16

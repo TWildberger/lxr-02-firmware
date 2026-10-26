@@ -34,19 +34,32 @@ and restores the autosaved kit and pattern. Saving a project writes
 `prj.nfo`, `glo.cfg` and all 64 kits and patterns into `/projNN`.
 `preset_saveGlobals()` writes `glo.cfg` into the *current* folder.
 
-## `.snd`: kit (255 bytes)
+## `.snd`: kit (261 bytes; legacy 255 bytes)
 
 | Offset | Size | Content |
 |--------|------|---------|
 | 0 | 8 | Kit name |
 | 8 | 247 | Sound parameters 0 … 246 (`END_OF_SOUND_PARAMETERS`), one byte each, in parameter id order |
+| 255 | 6 | Engine extension version tag, ASCII `EngV01` (new saves only) |
 
 * Values are stored exactly as held in memory. Modulation destination
   parameters (`PAR_VEL_DEST_*`, `PAR_TARGET_LFO*`) hold an index into
   `mod_targets` (`params.json`).
 * Shorter files (older firmware with fewer sound parameters) are accepted.
   Missing parameters read as 0.
-* SysEx `KIT_DUMP` carries the same 255 bytes (see [sysex.md](sysex.md)).
+* SysEx `KIT_DUMP` carries the same 261 bytes (see [sysex.md](sysex.md)).
+  The parameter count remains 247; the tag is not a parameter.
+* **Legacy migration:** without the exact `EngV01` tag, ids 221–226 (formerly
+  unused MIDI-note bytes) reset to zero. No legacy waveform, FM-mode or other
+  active sound byte is reinterpreted or range-clamped. With the tag, ids 221–223
+  select the engine for Drum 1–3 (`0` = legacy, `1` = feedback FM); other values
+  become zero. Ids 224–226 are timbre decay (0–127; invalid values become zero).
+  All established parameter and modulation-target IDs stay unchanged.
+  See [feedback-fm.md](feedback-fm.md).
+* Stock firmware ignores the trailer and these six formerly unused bytes, so
+  it plays new kits using the original engine. Saving with stock firmware drops
+  the trailer; reloading that save on this firmware deliberately selects legacy.
+  Back up new-engine kits before editing them on older firmware.
 * FX type (`PAR_FX_TYPE`, offset 242) 5 is the plate reverb, and reverb type
   (`PAR_FX_REVERB_TYPE`, offset 252) is 0 = `off`, 1 = `Plt`, 2 = `Eco`. Older
   kits with FX type 5 have reverb type 0, so they still play the FX bus dry,
@@ -57,7 +70,8 @@ and restores the autosaved kit and pattern. Saving a project writes
   dry.
 
 `tmp.snd` (autosave of the edit buffer) has a different layout: 1 byte kit
-slot number + 247 parameter bytes, and no name. At boot it is loaded after the
+slot number + 247 parameter bytes + the same 6-byte `EngV01` tag (254 bytes),
+and no name. Legacy 248-byte autosaves migrate as above. At boot it is loaded after the
 project, so it decides the edit buffer and the current kit slot.
 
 > Stock v1.7 writes the load/save menu cursor as the slot byte, and at boot
@@ -66,19 +80,24 @@ project, so it decides the edit buffer and the current kit slot.
 > actually in the edit buffer, and restores it as the current kit. Files are
 > compatible both ways.
 
-## `.pat`: pattern (3663 bytes)
+## `.pat`: pattern
 
 | Offset | Size | Content |
 |--------|------|---------|
 | 0 | 8 | Pattern name |
-| 8 | 6 | Version tag `"PatV03"` (files without `PatV` are read as version 1) |
-| 14 | 3649 | [Pattern body](#pattern-body) |
+| 8 | 6 | Version tag `"PatV04"` (files without `PatV` are read as version 1) |
+| 14 | 3649 | Legacy-compatible [pattern body](#pattern-body) |
+| 3663 | 168 | Packed three-bit trig conditions (V04 only) |
 
-SysEx `PATTERN_CHUNK` transfers carry `name[8]` + body (3657 bytes), i.e. the
-`.pat` file without the version tag.
+V04 files are 3831 bytes. V01–V03 load with every condition set to `Always`.
+The base pattern body and SysEx `PATTERN_CHUNK` layout remain unchanged:
+transfers carry `name[8]` + the 3649-byte body (3657 bytes total), without the
+version tag or condition extension. Conditions use the separate SysEx commands
+documented in [sysex.md](sysex.md).
 
-`tmp.pat` (autosave of the playing pattern) is 1 byte pattern number + body,
-with no name and no tag.
+`tmp.pat` (autosave of the playing pattern) is 1 byte pattern number + the
+3649-byte body, followed by the same 168-byte conditions extension. Older
+autosaves without the extension load with all conditions set to `Always`.
 
 ### Pattern body
 
@@ -89,6 +108,13 @@ with no name and no tag.
 | 3640 | 1 | Shuffle |
 | 3641 | 7 | Track lengths, one per track (steps) |
 | 3648 | 1 | Kit number linked to the pattern |
+
+The V04 conditions extension is track-major, then step-major (448 trigs).
+Each trig is a three-bit value packed least-significant-bit first. Values are
+`0` Always, `1` every 2nd cycle, `2` every 3rd, `3` every 4th, `4` first of
+every 2 cycles, `5` first of every 3, `6` first of every 4, and `7` every
+cycle after the first. The track cycle starts at zero when playback starts or
+the pattern changes.
 
 Tracks: 0–2 Drum 1–3, 3 Snare/Clap, 4 Cymbal, 5 Closed hi-hat,
 6 Open hi-hat.

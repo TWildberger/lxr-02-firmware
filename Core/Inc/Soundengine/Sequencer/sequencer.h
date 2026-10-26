@@ -21,6 +21,7 @@
 #include "Soundengine/globals.h"
 #include "Preset/SeqStep.h"
 #include "Parameters.h"
+#include "Soundengine/Sequencer/SeqCondition.h"
 
  /**<
   * we have 6 voices
@@ -103,6 +104,7 @@ typedef struct PatternSetStruct
 	uint8_t length[NUM_PATTERN][NUM_TRACKS];	//only used in euklid generator?
 	uint8_t shuffle[NUM_PATTERN];
 	uint8_t kitNr[NUM_PATTERN];
+	uint8_t seq_conditions[NUM_PATTERN][SEQ_CONDITION_BYTES];
 }PatternSet;
 
 typedef struct PatternBackupBufferStruct
@@ -114,6 +116,7 @@ typedef struct PatternBackupBufferStruct
 	uint8_t length[NUM_TRACKS];	//only used in euklid generator?
 	uint8_t shuffle;
 	uint8_t kitNr;
+	uint8_t seq_conditions[SEQ_CONDITION_BYTES];
 }PatternBackupBuffer;
 
 /*
@@ -303,5 +306,8 @@ uint8_t seq_getStepIndex(uint8_t trackNr);
 //------------------------------------------------------------------------------
 PatternSet* get_seq_patternSet_p(void);
 uint8_t seq_getActiveAutomationTrack(void);
+uint8_t seq_getStepCondition(uint8_t pattern, uint8_t track, uint8_t step);
+void seq_setStepCondition(uint8_t pattern, uint8_t track, uint8_t step, uint8_t condition);
+void seq_setBeatRepeat(uint8_t rate, uint8_t active);
 
 #endif /* SEQUENCER_H_ */

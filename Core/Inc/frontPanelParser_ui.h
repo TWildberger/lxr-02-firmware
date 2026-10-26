@@ -146,6 +146,8 @@ extern uint8_t frontPanel_sysexMode;
 #define SEQ_TRIGGER_OUT1_PPQ  0x37
 #define SEQ_TRIGGER_OUT2_PPQ  0x38
 #define SEQ_TRIGGER_GATE_MODE 0x39
+#define SEQ_STEP_CONDITION     0x3A
+#define SEQ_BEAT_REPEAT        0x3B
 
 //SysEx
 #define SYSEX_REQUEST_STEP_DATA			0x01

@@ -11,6 +11,7 @@ Ideas collected while adding the SysEx protocol ([sysex.md](sysex.md)). Checked 
 - [ ] Show a brief "SysEx" indicator when a host writes data.
 
 ## Sound
+- [x] **One new drum engine: feedback FM.** Opt-in on Drum 1-3; independent timbre decay and modulator feedback. See [feedback-fm.md](feedback-fm.md). Hardware performance/listening checks remain required.
 - [x] **Enable the hidden plate reverb.** Done: FX type `rev`, see [reverb.md](reverb.md).
 - [ ] Reverb: per-voice send levels (today a voice is either routed to the FX bus or not), or a second FX slot so the reverb can run with another FX.
 - [ ] Reverb: when FX type `rev` is selected on the front panel while the reverb type is `off`, switch the type to `Plt` automatically. It must not do this on kit load, where `off` keeps old FX-type-5 kits dry.
@@ -25,11 +26,19 @@ Ideas collected while adding the SysEx protocol ([sysex.md](sysex.md)). Checked 
 - [ ] Freeze: a "quantised engage" option that waits for the next grid line before the live signal is replaced (today the current slice plays on and repeats from the next grid line), and an option to repeat the previous slice instead of the current one.
 
 ## Sequencer
-- [ ] Per-step probability / conditional trigs.
-- [ ] Per-track ratchets (sub-step repeats) with a UI.
-- [ ] Pattern-chain editor and song-mode improvements.
+- [x] Per-step probability and conditional trigs. Probability was already part
+  of each step; this firmware adds deterministic every-N-cycle conditions.
+- [ ] Per-track ratchets (sub-step repeats) with a UI. Existing per-step flam
+  supports x2/x3/x4/x6/x8 repeats; a separate per-track ratchet control is
+  still deferred.
+- [x] Basic song/chain editing already exists as a 64-entry song list. Further
+  song-mode workflow improvements remain deferred.
+- [ ] Expand parameter locks beyond the two automation destinations already
+  stored per step. The seven-byte step format is preserved to avoid migrating
+  every existing pattern; use the current two locks for now.
 - [ ] Undo for step edits; copy/paste for a bar range.
-- [ ] Sequencer beat repeat: loop a range of pattern steps while held (a different feature from the audio freeze FX).
+- [x] Sequencer beat repeat: hold the eighth performance pad to loop a selected
+  1/16, 1/8, 1/4 or 1/2-note segment. This is distinct from audio freeze.
 
 ## SysEx protocol follow-ups (v1 limits)
 - [ ] Notify pattern/step edits, mutes and transport changes. For now the host has to re-request the pattern or `STATUS`.

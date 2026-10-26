@@ -151,6 +151,7 @@ static void test_identity_capabilities(void)
 	CHECK(SX_CAP_ECHO == 0x010);
 	CHECK(SX_CAP_SAVE == 0x020);
 	CHECK(SX_CAP_CPU_METER == 0x040);
+	CHECK(SX_CAP_DRUM_ENGINE == 0x080);
 	CHECK(SX_CAP_FX_FREEZE == 0x100);
 	const uint16_t capabilities = SX_CAP_KITS | SX_CAP_PATTERNS | SX_CAP_GLOBALS
 		| SX_CAP_PARAMS | SX_CAP_ECHO | SX_CAP_SAVE | SX_CAP_CPU_METER
@@ -164,6 +165,15 @@ static void test_identity_capabilities(void)
 	const uint16_t n = sxw_end(&w);
 	CHECK_BYTES(buf, n, 0xF0, 0x7D, 0x4C, 0x7F, 0x01, 0x02,
 		0x7F, 0x02, 0x01, 0xF7);
+
+	const uint16_t engineCapabilities = capabilities | SX_CAP_DRUM_ENGINE;
+	CHECK(engineCapabilities == 0x1FF);
+	CHECK((engineCapabilities & SX_CAP_FX_FREEZE) != 0);
+	sxw_begin(&w, buf, sizeof(buf), 0x7F, SX_CMD_IDENTITY_REPLY);
+	sxw_u14(&w, engineCapabilities);
+	const uint16_t engineLength = sxw_end(&w);
+	CHECK_BYTES(buf, engineLength, 0xF0, 0x7D, 0x4C, 0x7F, 0x01, 0x02,
+		0x7F, 0x03, 0x00, 0xF7);
 }
 //---------------------------------------------------------------------------
 static void test_writer_fields(void)

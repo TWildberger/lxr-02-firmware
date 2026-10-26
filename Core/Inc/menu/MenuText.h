@@ -43,6 +43,16 @@
 #define MENU_STEP_FLAM	 	24
 #define MENU_STEP_SHIFT	 	25
 #define MENU_AUDIO_OUT_FX	26
+#define MENU_DRUM_ENGINE		27
+#define MENU_STEP_CONDITION	28
+#define MENU_BEAT_REPEAT		29
+
+const char drumEngineNames[][4] =
+{
+	{2},
+	{"old"},
+	{"fbm"},
+};
 
 //-----------------------------------------------------------------
 // Shared texts. Reduce mem usage by pooling common text
@@ -90,6 +100,28 @@ const char stepShiftNames[][4] =
 	{"+7"},
 	//{"+8"},
 
+};
+//-----------------------------------------------------------------
+const char stepConditionNames[][4] =
+{
+	{8},
+	{"ALw"},
+	{"2nd"},
+	{"3rd"},
+	{"4th"},
+	{"1:2"},
+	{"1:3"},
+	{"1:4"},
+	{"n1s"},
+};
+//-----------------------------------------------------------------
+const char beatRepeatNames[][4] =
+{
+	{4},
+	{"16t"},
+	{"8th"},
+	{"4th"},
+	{"2nd"},
 };
 //-----------------------------------------------------------------
 const char patModeNames[][4] =
@@ -494,6 +526,10 @@ const char shortNames[][4]  =
 	{"mix"},
 	{"fx"},
 	{"xrn"},
+	{"eng"},
+	{"tmd"},
+	{"cnd"},
+	{"rpt"},
 
 };
 //-----------------------------------------------------------------
@@ -636,6 +672,10 @@ const char longNames[][16] =
 	{"Mixer"},
 	{"FX"},
 	{"XRuns"},
+	{"Engine"},
+	{"Timbre Decay"},
+	{"Condition"},
+	{"BeatRepeat"},
 };
 
 
