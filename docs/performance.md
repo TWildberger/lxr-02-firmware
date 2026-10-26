@@ -149,11 +149,41 @@ parameters were restored with `PARAM_SET` and verified byte-exactly with
 `PARAM_GET`. The active kit remained `TKit1`, FX remained off, and no save or
 SD write was performed.
 
-This is one five-minute operating condition, not full hardware acceptance. It
-does not cover audio listening, FM extremes, DC/clipping/retrigger/choke/morph
-or save/reload behavior, the FX modes, modulation/UI/MIDI/SD switching, or
-sequencer condition and beat-repeat behavior. Those checks remain pending in
-the [feedback-FM hardware acceptance checklist](feedback-fm.md#hardware-acceptance-checklist)
+#### Feedback-FM with plate and Eco reverb
+
+Two further five-minute runs used the same kit, pattern, sequencer state,
+seven-channel 16th-note workload and three FM settings above. All six sound
+voices were routed to FX in the live edit buffer. Reverb used dry/wet 50 and
+P1–P4 = 20/100/64/64; the reverb kind was `Plt` for the plate run and `Eco`
+for the Eco run. Both tests followed a freeze-path test.
+
+| Reverb | Time | now % | peak % | fx % | xruns |
+|--------|-----:|------:|-------:|-----:|------:|
+| `Plt` | 60 s | 70.0 | 72.9 | 11.6 | 0 |
+| `Plt` | 120 s | 70.0 | 72.9 | 11.6 | 0 |
+| `Plt` | 180 s | 70.0 | 72.9 | 11.6 | 0 |
+| `Plt` | 240 s | 70.0 | 73.3 | 11.6 | 0 |
+| `Plt` | 300 s | 70.0 | 73.3 | 11.6 | 0 |
+| `Eco` | 60 s | 65.3 | 68.7 | 6.8 | 0 |
+| `Eco` | 120 s | 65.2 | 68.7 | 6.8 | 0 |
+| `Eco` | 180 s | 65.2 | 68.7 | 6.8 | 0 |
+| `Eco` | 240 s | 65.3 | 68.7 | 6.8 | 0 |
+| `Eco` | 300 s | 65.2 | 68.7 | 6.8 | 0 |
+
+Voices measured 53.1% and mixer 5.3% in both runs. An immediate status after
+switching from `Plt` into `Eco` showed 69.2% now and 11.1% FX during the
+transition; it is excluded above, which reports the steady readings beginning
+at 60 seconds. The original values of all 28 changed/read IDs, including FM
+controls, FX settings and routing, were restored to the edit buffer and
+independently verified with `PARAM_GET`: FX off, all routes direct and all
+three FM engines set to `old`. No save or SD write was performed.
+
+These are measured five-minute operating conditions, not full hardware
+acceptance. No audio was captured or auditioned, and these runs do not cover
+FM extremes, DC/clipping/retrigger/choke/morph or save/reload behavior, freeze
+steady-state performance, modulation/UI/MIDI/SD switching, or sequencer
+condition and beat-repeat behavior. Those checks remain pending in the
+[feedback-FM hardware acceptance checklist](feedback-fm.md#hardware-acceptance-checklist)
 and the checklist below.
 
 ## Sequencer conditions and beat-repeat resources
