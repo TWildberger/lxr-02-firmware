@@ -20,7 +20,7 @@
  },
  "firmware": {
   "base": "Erica Synths LXR-02 v1.7",
-  "source_commit": "e3cfe41734aca24786c10d27f52c4921c57f8422"
+  "source_commit": "5b0e554db298aa72115f2809cc22f557d4df75ae"
  },
  "counts": {
   "NUM_PARAMS": 305,

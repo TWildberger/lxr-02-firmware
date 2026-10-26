@@ -22,9 +22,11 @@ x8); each step also retains its two existing automation parameter locks.
 Set the repeat rate in the **pattern settings** page (16th, 8th, quarter or
 half note). In performance mode, hold the eighth performance pad (the
 otherwise unused eighth roll pad) to repeat the current segment; release it
-to resume at the position the sequencer would naturally have reached. Stopping
-the sequencer or switching patterns also releases the repeat. This loops
-sequencer steps and is independent of the audio freeze effect.
+to resume at the position the sequencer would naturally have reached. The
+repeat holds the condition-cycle context for the loop, while the hidden natural
+position and cycle counters continue advancing. Stopping the sequencer or
+switching patterns also releases the repeat. This loops sequencer steps and is
+independent of the audio freeze effect.
 
 The existing song mode already stores and edits a 64-entry pattern chain.
 Additional per-track ratchet controls, more than two parameter locks per step,

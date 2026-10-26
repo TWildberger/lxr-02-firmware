@@ -122,13 +122,17 @@ Firmware: `2f179b5` · Image SHA-256: `46b8f317…` · Date: 2026-10-25 · Kit: 
 
 ## Sequencer condition storage estimate
 
-Packed conditions add 168 bytes per pattern (10,752 bytes across 64 patterns,
-about 2.8% of the MCU's 384 KiB RAM), plus a small set of cycle/repeat counters.
-The pattern table is in ordinary `.bss`, not the tightly budgeted ITCM/DTCM
-sections. Sequencer conditions add a small comparison to the existing step
-probability/ratchet path; their CPU cost has not been measured on hardware.
-Repeat changes sequencer indices only and does not add an audio FX algorithm or
-audio-buffer allocation. See the pending
+Packed conditions add 168 bytes per pattern (10,752 bytes across 64 patterns),
+plus a 168-byte backup copy and about 45 bytes of cycle/repeat counters. Against
+the FM branch's 279,000-byte general-RAM baseline, that is about 289,965 bytes
+(73.7% of 384 KiB), before linker alignment. The pattern table and backup are
+ordinary `.bss`, not the tightly budgeted ITCM/DTCM sections. Sequencer
+conditions add a small comparison to the existing step probability/ratchet
+path; their CPU cost has not been measured on hardware. Repeat changes
+sequencer indices only and does not add an audio FX algorithm or audio-buffer
+allocation. It adds some code to the ITCM-resident sequencer tick; the local
+release toolchain is missing newlib's `nano.specs`, so its exact ITCM growth
+could not be measured. See the pending
 [hardware checklist](sequencer-features.md#hardware-validation-checklist).
 
 ## Plate reverb
