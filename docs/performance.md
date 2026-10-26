@@ -131,8 +131,18 @@ conditions add a small comparison to the existing step probability/ratchet
 path; their CPU cost has not been measured on hardware. Repeat changes
 sequencer indices only and does not add an audio FX algorithm or audio-buffer
 allocation. It adds some code to the ITCM-resident sequencer tick; the local
-release toolchain is missing newlib's `nano.specs`, so its exact ITCM growth
-could not be measured. See the pending
+release build is blocked before compiling project sources. The project's
+documented `brew install --cask gcc-arm-embedded` installation requires an
+interactive `sudo` authorization, unavailable in the current non-interactive
+build session. The official Arm GNU 15.3.rel2 compiler is not installed or on
+`PATH`. The only discovered fallback is a cached Homebrew `arm-none-eabi-gcc`
+16.2 compiler; it lacks `nano.specs`, and CMake's compiler probe also aborts
+because its `cc1` cannot load `_ZSTD_compress`. CMake 4.4.3 and Ninja 1.13.2 are
+available. After an administrator installs the documented cask (or the
+official Arm `.pkg`), rerun
+`cmake --preset release --fresh -DARM_TOOLCHAIN_DIR=<toolchain-bin>` followed
+by `cmake --build --preset release` to measure the exact ITCM growth. See the
+pending
 [hardware checklist](sequencer-features.md#hardware-validation-checklist).
 
 ## Plate reverb
