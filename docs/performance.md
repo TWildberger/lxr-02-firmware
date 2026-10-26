@@ -1,8 +1,8 @@
 # Audio CPU meter and performance
 
 The firmware measures how much of the available time the audio render uses.
-This is the headroom left for new engines and effects (for example the plate
-reverb in [backlog.md](backlog.md)). This page describes what is measured, how
+This is the headroom left for new engines and effects (for example the
+[plate reverb](reverb.md)). This page describes what is measured, how
 to read it, and holds the numbers measured on hardware.
 
 ## What is measured
@@ -23,7 +23,7 @@ cycle counter is read around that call, and the result is accounted in
 | **peak** (`pk`) | Worst single block since boot or the last reset |
 | **voices** (`vce`) | LFOs, modulation, voice parameter updates and the six voice renders |
 | **mixer** (`mix`) | Buffer clears, per-voice decimation, pan and output routing |
-| **fx** (`fx`) | `FxBus_process` (distortion, ring, compressor, delay) |
+| **fx** (`fx`) | `FxBus_process` (distortion, ring, compressor, delay, reverb), including the one-off buffer clear when the FX type changes |
 | **xruns** (`xrn`) | Underruns: the DAC wanted a new block but the previous one had not been rendered yet. Saturates at 16383 |
 
 Notes:
@@ -114,10 +114,61 @@ boot/kit-load work such as SD access, so it is not a steady-state measurement.
 The tested kit does not use FX. Voices render continuously even when not being
 triggered, so the load stays nearly flat at about 57–60%, leaving about 40%
 headroom. Sequencer playback was not measured because MIDI Start is ignored
-with the current sync settings. FX-specific, 300 BPM and SD-save loads remain
-to be measured.
+with the current sync settings. Delay and reverb loads are in
+[Plate reverb](#plate-reverb). 300 BPM and SD-save loads remain to be
+measured.
 
 Firmware: `2f179b5` · Image SHA-256: `46b8f317…` · Date: 2026-10-25 · Kit: `TKit1` (slot 16)
+
+## Plate reverb
+
+The reverb ([reverb.md](reverb.md)) is counted in **fx**.
+
+### Measured
+
+Measured on the user's LXR-02 over USB with the PR #3 release image
+(`LXR_V2_V1.7-sx.img`, SHA-256 `d90e572d…`), kit slot 16 (`TKit1`, FX normally
+off), on 2026-10-25. All 7 voices were retriggered on 16ths at 120 BPM during
+each 6 s window, and the counters were reset for each row. FX dry/wet was 50,
+P1–P4 were 20/100/64/64. Values are percentages of block time.
+
+| Setting | now % | peak % | voices % | mixer % | fx % | xruns |
+|---------|------:|-------:|---------:|--------:|-----:|------:|
+| FX off | 57.9 | 59.1 | 52.6 | 5.1 | 0.2 | 0 |
+| FX `del` | 61.0 | 62.3 | 52.6 | 5.1 | 3.2 | 0 |
+| FX `rev`, type `off` | 58.3 | 59.4 | 52.6 | 5.1 | 0.5 | 0 |
+| FX `rev`, type `Plt` | 69.3 | 70.3 | 52.6 | 5.1 | 11.5 | 0 |
+| FX `rev`, type `Eco` | 64.4 | 66.6 | 52.6 | 5.1 | 6.7 | 0 |
+
+| Switching test (`PARAM_SET`, 20 switches 150 ms apart) | peak % | xruns |
+|--------------------------------------------------------|-------:|------:|
+| FX type `del` ↔ `rev` (type `Plt`) | 78.0 | 0 |
+| Reverb type `Plt` ↔ `Eco` | 72.4 | 0 |
+
+The reverb's cost does not depend on how many voices are routed to the FX bus,
+because the tank runs on every block. `Plt` costs about 11.3 points over FX off
+and leaves about 30% headroom. `Eco` costs about 6.5 points. The one-off buffer
+clears on a type change raise the peak, but did not cause xruns.
+
+Firmware: `d30f967` · Image SHA-256: `d90e572d…` · Date: 2026-10-25 · Kit: `TKit1` (slot 16)
+
+### Estimate from the code
+
+Before the measurement, the cost was estimated from the disassembly of the
+release build (GCC 15.3, `-O3`). The measurement is about 1.5–2 points above
+the estimate for `Plt` and about 1 point above it for `Eco`.
+
+| Reverb type | Instructions | Estimated cycles / block | Estimated fx % |
+|-------------|-------------|--------------------------|----------------|
+| `off` (dry passthrough) | ≈4 per sample | ≈0.6 k | ≈0.2 (same as FX off) |
+| `Plt` | 348 per frame (tank) + ≈30 (dry/wet mix) | 24–31 k | ≈8–10 |
+| `Eco` | 365 per 2 frames + ≈30 per frame | 14–18 k | ≈4.5–6 |
+| Selecting the reverb or changing its type (once) | 40 KB clear | ≈10 k | +3 in that block |
+| Reverb → delay switch (once) | 64 KB clear | ≈16 k | +5 in that block |
+| Delay → reverb switch (once) | 64 KB + 40 KB clear | ≈26 k | +8 in that block |
+
+Cycles assumed 1.0–1.3 cycles per instruction (Cortex-M7 dual issue; code in
+flash behind the I-cache, delay lines and state in DTCM).
 
 ## Hardware test checklist
 

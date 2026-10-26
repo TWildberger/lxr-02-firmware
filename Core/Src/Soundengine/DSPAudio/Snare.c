@@ -151,12 +151,12 @@ void Snare_calcSyncBlock(int16_t* buf, const uint8_t size)
 	int16_t oscBuf[size];
 
 	calcNoiseBlock(&snareVoice.noiseOsc,buf,size,0.9f);
-#if USE_REVERB
+#if REVERB_CHEAP_VOICE_FILTERS
 	if(fxBus.fxType != FX_REVERB)
 	{
 #endif
 		SVF_calcBlockZDF(&snareVoice.filter,snareVoice.filterType,buf,size);
-#if USE_REVERB
+#if REVERB_CHEAP_VOICE_FILTERS
 	}
 	else
 	{

@@ -1,6 +1,6 @@
 # Firmware backlog
 
-Ideas collected while adding the SysEx protocol ([sysex.md](sysex.md)). None of these are implemented yet. Each item should become its own PR and be tested on hardware. (This repo has GitHub Issues turned off, so the list lives here.)
+Ideas collected while adding the SysEx protocol ([sysex.md](sysex.md)). Checked items are done. Each item should become its own PR and be tested on hardware. (This repo has GitHub Issues turned off, so the list lives here.)
 
 ## Device UI / workflow
 - [ ] Make kit/pattern browsing quicker: show names while scrolling, and preview a kit before loading it.
@@ -11,7 +11,11 @@ Ideas collected while adding the SysEx protocol ([sysex.md](sysex.md)). None of 
 - [ ] Show a brief "SysEx" indicator when a host writes data.
 
 ## Sound
-- [ ] **Enable the hidden plate reverb.** `Core/Src/Soundengine/FxBus.c` has a `USE_REVERB` path (`Reverb_init`/`Reverb_process`, `FX_REVERB`), and `PAR_FX_REVERB_TYPE` exists in `Parameters.h`. Check CPU and memory headroom first with the CPU meter ([performance.md](performance.md)): in the `-sx` build ITCM is at 93% and DTCM at 82%. Then add a menu entry and regenerate `params.json`.
+- [x] **Enable the hidden plate reverb.** Done: FX type `rev`, see [reverb.md](reverb.md).
+- [ ] Reverb: per-voice send levels (today a voice is either routed to the FX bus or not), or a second FX slot so the reverb can run with another FX.
+- [ ] Reverb: when FX type `rev` is selected on the front panel while the reverb type is `off`, switch the type to `Plt` automatically. It must not do this on kit load, where `off` keeps old FX-type-5 kits dry.
+- [ ] Reverb: a size/diffusion parameter (needs a new kit parameter or a sub-menu), and crossfade pre-delay changes. Today a pre-delay change jumps and can click in the wet signal.
+- [ ] Remove the now-unused `TiltEq.c` (was only used by the old reverb).
 - [ ] Add per-voice velocity curves.
 
 ## Sequencer

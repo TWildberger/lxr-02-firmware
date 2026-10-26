@@ -16,6 +16,7 @@
 #include "Soundengine/FxBus.h"
 #include "Soundengine/DSPAudio/BufferTools.h"
 #include "Soundengine/DSPAudio/mixer.h"
+#include "Soundengine/DSPAudio/FX/FxRamBuffer.h"
 INDTCMZ FxBus fxBus;
 
 void FxBus_init()
@@ -23,6 +24,8 @@ void FxBus_init()
 	fxBus.dryWet = 0;
 	fxBus.audioRouting = 0;
 	fxBus.fxType = FX_OFF;
+	fxBus.lastFxType = FX_OFF;
+	fxBus.bufferOwner = FX_OFF;
 
 	fxBus.delay.delayType = DELAY_NORMAL;
 
@@ -34,7 +37,7 @@ void FxBus_init()
 
 
 #if USE_REVERB
-	Reverb_init(&fxBus.reverb);
+	Reverb_init(&fxBus.reverb, FX_BUFFER);
 #endif
 }
 
@@ -42,6 +45,9 @@ IN_ITCM_RAM void FxBus_process(int16_t *fxBuffer, int16_t* outL,int16_t* outR,in
 {
 	int16_t* out;
 	int16_t* out2 = NULL;
+
+	if(fxBus.fxType != fxBus.lastFxType) FxBus_handleFxChange();
+
 	// < MIXER_ROUTING_DAC1_L -> stereo 1 or 2
 	const uint8_t channels = fxBus.audioRouting < MIXER_ROUTING_DAC1_L ? 2 : 1;
 	switch(fxBus.audioRouting)
@@ -126,12 +132,47 @@ IN_ITCM_RAM void FxBus_process(int16_t *fxBuffer, int16_t* outL,int16_t* outR,in
 		break;
 #if USE_REVERB
 	case FX_REVERB:
-		Reverb_process(&fxBus.reverb, fxBuffer, out, out2, size, channels, fxBus.dryWet);
+		Reverb_process(&fxBus.reverb, fxBuffer, out, size, channels, fxBus.dryWet);
 		break;
 #endif
 
 	}
 
+}
+
+// FX types that keep audio in the shared FX_BUFFER
+static uint8_t FxBus_usesFxBuffer(uint8_t type)
+{
+	switch(type)
+	{
+	case FX_DELAY:
+#if USE_REVERB
+	case FX_REVERB:
+#endif
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+// Not in ITCM: only runs once per FX type change.
+__attribute__((noinline)) void FxBus_handleFxChange()
+{
+	const uint8_t type = fxBus.fxType;
+
+	if(FxBus_usesFxBuffer(type) && fxBus.bufferOwner != type)
+	{
+		// another FX left its data in the shared buffer: start from silence
+		if(fxBus.bufferOwner != FX_OFF)
+			FxRamBuffer_clear();
+		fxBus.bufferOwner = type;
+	}
+#if USE_REVERB
+	// don't resume a stale tail when the reverb is selected again
+	if(type == FX_REVERB)
+		Reverb_clear(&fxBus.reverb);
+#endif
+	fxBus.lastFxType = type;
 }
 
 void FxBus_prepareFxChange()
@@ -140,7 +181,9 @@ void FxBus_prepareFxChange()
 //	Ringmod_resetPhase(&fxBus.ringmod);
 }
 
-IN_ITCM_RAM void FxBus_updateParameter()
+// control rate only (parameter changes, LFO at most once per block): kept
+// out of the nearly full ITCM
+void FxBus_updateParameter()
 {
 	switch(fxBus.fxType)
 	{
@@ -177,11 +220,10 @@ IN_ITCM_RAM void FxBus_updateParameter()
 		break;
 #if USE_REVERB
 	case FX_REVERB:
-		Reverb_setDelayTime(&fxBus.reverb, fxBus.parameter[0]);
-		Reverb_setFeedback(&fxBus.reverb, fxBus.parameter[1]);
-		Reverb_setComposition(&fxBus.reverb, fxBus.parameter[2]);
-
-		Reverb_setVariation(&fxBus.reverb, fxBus.parameter[3]);
+		Reverb_setPreDelay(&fxBus.reverb, fxBus.parameter[0]);
+		Reverb_setDecay(&fxBus.reverb, fxBus.parameter[1]);
+		Reverb_setTone(&fxBus.reverb, fxBus.parameter[2]);
+		Reverb_setEarly(&fxBus.reverb, fxBus.parameter[3]);
 		break;
 #endif
 	default:
@@ -189,7 +231,7 @@ IN_ITCM_RAM void FxBus_updateParameter()
 	}
 }
 
-IN_ITCM_RAM void FxBus_setParameter(uint8_t idx, float value)
+void FxBus_setParameter(uint8_t idx, float value)
 {
 	fxBus.parameter[idx] = value;
 

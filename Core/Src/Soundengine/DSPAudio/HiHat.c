@@ -175,13 +175,13 @@ void HiHat_calcSyncBlock(int16_t* buf, const uint8_t size)
 
 	calcNextOscSampleFmBlock(&hatVoice.osc,mod1,buf,size,0.5f, hatVoice.pwm) ;
 
-#if USE_REVERB
+#if REVERB_CHEAP_VOICE_FILTERS
 	if(fxBus.fxType != FX_REVERB)
 	{
 #endif
 		SVF_calcBlockZDF(&hatVoice.filter,hatVoice.filterType,buf,size);
 
-#if USE_REVERB
+#if REVERB_CHEAP_VOICE_FILTERS
 	}
 	else
 	{

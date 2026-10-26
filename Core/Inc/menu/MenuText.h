@@ -102,8 +102,10 @@ const char patModeNames[][4] =
 //-----------------------------------------------------------------
 const char reverbNames[][4] =
 {
-	{1},		//number of entries
+	{3},		//number of entries
+	{"off"},
 	{"Plt"},
+	{"Eco"},
 
 };
 //-----------------------------------------------------------------
@@ -128,13 +130,13 @@ const char ratioNames[][4] =
 //-----------------------------------------------------------------
 const char fxNames[][4] =
 {
-	{5},		//number of entries
+	{6},		//number of entries
 	{"off"},
 	{"drv"},
 	{"rng"},
 	{"cmp"},
 	{"del"},
-	//{"rev"}
+	{"rev"}
 };
 //-----------------------------------------------------------------
 const char distNames[][4] =

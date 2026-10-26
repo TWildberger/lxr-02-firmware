@@ -1424,7 +1424,9 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				break;
 
 			case CC2_FX_REVERB_TYPE:
-
+#if USE_REVERB
+				Reverb_setType(&fxBus.reverb, value.itg);
+#endif
 				break;
 
 			case CC2_FX_DELAY_TYPE:

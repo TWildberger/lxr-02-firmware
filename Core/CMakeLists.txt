@@ -97,10 +97,6 @@ add_library(lxr_dsp OBJECT
     Src/Soundengine/DSPAudio/FX/FxRamBuffer.c
     Src/Soundengine/DSPAudio/FX/Reverb.c
     Src/Soundengine/DSPAudio/FX/Ringmod.c
-    Src/Soundengine/DSPAudio/FX/VerbTools/AllpassDelay.c
-    Src/Soundengine/DSPAudio/FX/VerbTools/sinCos.c
-    Src/Soundengine/DSPAudio/FX/VerbTools/VerbDelay.c
-    Src/Soundengine/DSPAudio/FX/VerbTools/VerbModDelay.c
 )
 
 # Audio engine: codec/I2S DMA, sample block rendering, FX bus, clock/trigger I/O.
@@ -178,7 +174,6 @@ set(LXR_ITCM_SOURCES
     Src/Soundengine/DSPAudio/Snare.c
     Src/Soundengine/DSPAudio/transientGenerator.c
     Src/Soundengine/DSPAudio/FX/Distortion.c
-    Src/Soundengine/DSPAudio/FX/Reverb.c
     Src/Soundengine/MIDI/ParameterArray.c
     Src/Soundengine/Sequencer/sequencer.c
 )

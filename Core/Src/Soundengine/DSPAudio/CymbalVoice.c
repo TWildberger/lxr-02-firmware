@@ -166,13 +166,13 @@ void Cymbal_calcSyncBlock(int16_t* buf, const uint8_t size)
 		bufferTool_addBuffersSaturating(mod,mod2,size);
 
 		calcNextOscSampleFmBlock(&cymbalVoice.osc,mod,buf,size,1.f, cymbalVoice.pwm) ;
-#if USE_REVERB
+#if REVERB_CHEAP_VOICE_FILTERS
 		if(fxBus.fxType != FX_REVERB)
 		{
 #endif
 			SVF_calcBlockZDF(&cymbalVoice.filter,cymbalVoice.filterType,buf,size);
 
-#if USE_REVERB
+#if REVERB_CHEAP_VOICE_FILTERS
 		}
 		else
 		{
