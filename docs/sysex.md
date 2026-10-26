@@ -130,6 +130,7 @@ Receive rules (device side; hosts should apply the same):
 | `43` | `PARAM_NOTIFY` | device → host | — |
 | `44` | `ECHO_SET` | host → device | `ACK` |
 | `45` | `EVENT` | device → host | — |
+| `46` | `FX_FREEZE` | host → device | none (only `NAK` on error) |
 | `7E` | `ACK` | device → host | — |
 | `7F` | `NAK` | device → host | — |
 
@@ -455,7 +456,29 @@ See [section 7](#7-parameter-echo-device--host-notifications).
 | `01` | `KIT_CHANGED` | current kit slot | Edit buffer changed wholesale (kit load, project load, …). Re-request kit `7F` and globals. |
 | `02` | `PATTERN_CHANGED` | active pattern | Active pattern switched |
 
-### 5.17 `ACK` (`7E`) / `NAK` (`7F`)
+### 5.17 `FX_FREEZE` (`46`)
+
+Payload: u7 value. Engages or releases the freeze / beat repeat FX
+([freeze.md](freeze.md)), like holding perf-mode steps 9–16 or NRPN 210:
+
+| Value | Action |
+|-------|--------|
+| `00` | release |
+| `01`–`08` | engage (or change rate) at 1/4, 1/4T, 1/8, 1/8T, 1/16, 1/16T, 1/32, 1/32T |
+| `09`–`7F` | engage at the slice length set by `PAR_FX_P1` |
+
+* There is **no reply on success**, for low latency.
+* `NAK(46, ERR_LENGTH)`: no payload byte.
+* `NAK(46, ERR_RANGE, type)`: the FX type (`PAR_FX_TYPE`) is not 6 (`frz`).
+  The argument is the current FX type.
+* The engaged state is not a parameter: it is not echoed, not in kit dumps and
+  not saved. A host should send `00` when the control is let go and when it
+  disconnects.
+
+Example: engage at 1/16, then release:
+`F0 7D 4C 7F 01 46 05 3D F7`, `F0 7D 4C 7F 01 46 00 38 F7`
+
+### 5.18 `ACK` (`7E`) / `NAK` (`7F`)
 
 | Field | `ACK` | `NAK` |
 |-------|-------|-------|
@@ -493,7 +516,8 @@ Modulation destinations (`PAR_VEL_DEST_*`, `PAR_TARGET_LFO*`,
 `params.json`, not a parameter id.
 
 Ranges can grow between builds without new ids. With the plate reverb
-([reverb.md](reverb.md)), `PAR_FX_TYPE` (234) accepts 0–5 (5 = `rev`) and
+([reverb.md](reverb.md)) and the freeze ([freeze.md](freeze.md)),
+`PAR_FX_TYPE` (234) accepts 0–6 (5 = `rev`, 6 = `frz`) and
 `PAR_FX_REVERB_TYPE` (244) accepts 0–2 (`off`/`Plt`/`Eco`). Stock v1.7 accepts
 0–4 and 0. Use the `max` from the matching `params.json`.
 

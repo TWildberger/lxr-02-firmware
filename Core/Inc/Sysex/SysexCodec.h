@@ -47,6 +47,7 @@ enum SxCommand {
 	SX_CMD_PARAM_NOTIFY		= 0x43,
 	SX_CMD_ECHO_SET			= 0x44,
 	SX_CMD_EVENT			= 0x45,
+	SX_CMD_FX_FREEZE		= 0x46,
 	SX_CMD_ACK				= 0x7E,
 	SX_CMD_NAK				= 0x7F,
 };

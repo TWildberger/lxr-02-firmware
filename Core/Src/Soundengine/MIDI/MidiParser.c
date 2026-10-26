@@ -132,8 +132,16 @@ float midiParser_calcDetune(uint8_t value)
 	return cent;
 }
 //-----------------------------------------------------------
+// NRPN numbers past the CC2 parameter range (data1 is 8 bit)
+#define NRPN_FX_FREEZE	210	// freeze FX engage: 0 = release, 1..8 = rate, 9..127 = P1 rate
+
 static void midiParser_nrpnHandler(uint16_t value)
 {
+	if(midiParser_activeNrpnNumber == NRPN_FX_FREEZE)
+	{
+		FxBus_freezeControl((uint8_t)value);
+		return;
+	}
 	MidiMsg msg2;
 	msg2.status = MIDI_CC2;
 	msg2.data1 = midiParser_activeNrpnNumber;

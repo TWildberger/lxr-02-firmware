@@ -52,6 +52,9 @@ and restores the autosaved kit and pattern. Saving a project writes
   kits with FX type 5 have reverb type 0, so they still play the FX bus dry,
   as on stock v1.7. Kits saved with the reverb on play the FX bus dry on stock
   v1.7. See [reverb.md](reverb.md#compatibility).
+* FX type 6 is the freeze / beat repeat (`frz`, [freeze.md](freeze.md)). It uses
+  P1–P4 like the other FX types; there is no new byte. Stock v1.7 plays FX type 6
+  dry.
 
 `tmp.snd` (autosave of the edit buffer) has a different layout: 1 byte kit
 slot number + 247 parameter bytes, and no name. At boot it is loaded after the

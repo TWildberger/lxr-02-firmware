@@ -130,13 +130,14 @@ const char ratioNames[][4] =
 //-----------------------------------------------------------------
 const char fxNames[][4] =
 {
-	{6},		//number of entries
+	{7},		//number of entries
 	{"off"},
 	{"drv"},
 	{"rng"},
 	{"cmp"},
 	{"del"},
-	{"rev"}
+	{"rev"},
+	{"frz"}
 };
 //-----------------------------------------------------------------
 const char distNames[][4] =
@@ -475,6 +476,8 @@ const char shortNames[][4]  =
 	{"tim"},
 	{"pre"},
 	{"ref"},
+	{"pit"},
+	{"gat"},
 	{"p1"},
 	{"p2"},
 	{"p3"},
@@ -615,6 +618,8 @@ const char longNames[][16] =
 	{"Time"},
 	{"PreDelay"},
 	{"Reflxion"},
+	{"Pitch"},
+	{"Gate"},
 	{"Param 1"},
 	{"Param 2"},
 	{"Param 3"},

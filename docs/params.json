@@ -3,7 +3,7 @@
  "format_version": 1,
  "firmware": {
   "base": "Erica Synths LXR-02 v1.7",
-  "source_commit": "1216aaeec4059d8b0c335e4ecbd066898500c602"
+  "source_commit": "751985a6a2db36152667953bc0ee4ff9668a903c"
  },
  "counts": {
   "NUM_PARAMS": 305,
@@ -22,6 +22,7 @@
   "cc": "Sound params 0..126 map to CC (id+1) on the voice's channel or the global channel. CC0 is bank select (kit load), so param 127 is not reachable via CC.",
   "nrpn": "Sound params 128..246 map to NRPN (id-128): CC99=msb, CC98=lsb, CC6=value (7-bit).",
   "mute_nrpn": "NRPN 1000..1006 mute voice 1..7 (value 0/1).",
+  "freeze_nrpn": "NRPN 210 (CC99=1, CC98=82) engages the freeze FX (PAR_FX_TYPE 6): CC6 value 0 = release, 1..8 = 1/4, 1/4T, 1/8, 1/8T, 1/16, 1/16T, 1/32, 1/32T, 9..127 = rate set by PAR_FX_P1. Not a parameter. Same values as SysEx FX_FREEZE (docs/freeze.md).",
   "panel_edits": "Stock firmware does not transmit CC/NRPN for panel edits. Use SysEx parameter echo (docs/sysex.md) on firmware that supports it.",
   "mod_target_values": "VEL_DEST_x / TARGET_LFOx / P1_DEST / P2_DEST hold a modTargets index in memory, .snd files and SysEx; over NRPN the value is the target parameter number."
  },
@@ -263,7 +264,8 @@
     "rng",
     "cmp",
     "del",
-    "rev"
+    "rev",
+    "frz"
    ]
   },
   "19": {
@@ -10140,7 +10142,7 @@
    },
    "dtype": "MENU",
    "min": 0,
-   "max": 5,
+   "max": 6,
    "menu": "MENU_FX",
    "labels": [
     "off",
@@ -10148,7 +10150,8 @@
     "rng",
     "cmp",
     "del",
-    "rev"
+    "rev",
+    "frz"
    ],
    "ui": [
     {
@@ -10196,6 +10199,14 @@
      "page_label": "FX",
      "subpage": 5,
      "subpage_label": "Reverb",
+     "slot": 0,
+     "label": "typ"
+    },
+    {
+     "page": "FX_MODE_PAGE",
+     "page_label": "FX",
+     "subpage": 6,
+     "subpage_label": "Freeze",
      "slot": 0,
      "label": "typ"
     }
@@ -10278,6 +10289,14 @@
      "subpage_label": "Reverb",
      "slot": 1,
      "label": "out"
+    },
+    {
+     "page": "FX_MODE_PAGE",
+     "page_label": "FX",
+     "subpage": 6,
+     "subpage_label": "Freeze",
+     "slot": 1,
+     "label": "out"
     }
    ],
    "midi": {
@@ -10347,6 +10366,14 @@
      "page_label": "FX",
      "subpage": 5,
      "subpage_label": "Reverb",
+     "slot": 2,
+     "label": "d/w"
+    },
+    {
+     "page": "FX_MODE_PAGE",
+     "page_label": "FX",
+     "subpage": 6,
+     "subpage_label": "Freeze",
      "slot": 2,
      "label": "d/w"
     }
@@ -10449,6 +10476,14 @@
      "subpage_label": "Reverb",
      "slot": 4,
      "label": "pre"
+    },
+    {
+     "page": "FX_MODE_PAGE",
+     "page_label": "FX",
+     "subpage": 6,
+     "subpage_label": "Freeze",
+     "slot": 4,
+     "label": "len"
     }
    ],
    "midi": {
@@ -10504,6 +10539,14 @@
      "subpage_label": "Reverb",
      "slot": 5,
      "label": "dec"
+    },
+    {
+     "page": "FX_MODE_PAGE",
+     "page_label": "FX",
+     "subpage": 6,
+     "subpage_label": "Freeze",
+     "slot": 5,
+     "label": "pit"
     }
    ],
    "midi": {
@@ -10559,6 +10602,14 @@
      "subpage_label": "Reverb",
      "slot": 6,
      "label": "ton"
+    },
+    {
+     "page": "FX_MODE_PAGE",
+     "page_label": "FX",
+     "subpage": 6,
+     "subpage_label": "Freeze",
+     "slot": 6,
+     "label": "dec"
     }
    ],
    "midi": {
@@ -10614,6 +10665,14 @@
      "subpage_label": "Reverb",
      "slot": 7,
      "label": "ref"
+    },
+    {
+     "page": "FX_MODE_PAGE",
+     "page_label": "FX",
+     "subpage": 6,
+     "subpage_label": "Freeze",
+     "slot": 7,
+     "label": "gat"
     }
    ],
    "midi": {

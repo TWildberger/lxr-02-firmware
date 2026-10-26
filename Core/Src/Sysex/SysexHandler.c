@@ -28,6 +28,7 @@
 #include "Soundengine/MIDI/Uart.h"
 #include "Soundengine/USB/usb_manager.h"
 #include "Soundengine/CpuMeter.h"
+#include "Soundengine/FxBus.h"
 #include "frontPanelParser_ui.h"
 
 #ifndef LXR_FW_MAJOR
@@ -839,6 +840,14 @@ static void sx_cmdEchoSet(SxReader *r)
 	sx_ack(SX_CMD_ECHO_SET, on);
 }
 //---------------------------------------------------------------------------
+// momentary performance control: no reply on success (like PARAM_SET)
+static void sx_cmdFxFreeze(SxReader *r)
+{
+	const uint8_t value = sxr_u7(r);
+	if(r->err) { sx_nak(SX_CMD_FX_FREEZE, SX_ERR_LENGTH, 0); return; }
+	if(!FxBus_freezeControl(value)) sx_nak(SX_CMD_FX_FREEZE, SX_ERR_RANGE, fxBus.fxType);
+}
+//---------------------------------------------------------------------------
 static void sx_dispatch(const SxFrame *f)
 {
 	SxReader r;
@@ -861,6 +870,7 @@ static void sx_dispatch(const SxFrame *f)
 	case SX_CMD_PARAM_GET:		sx_cmdParamGet(&r); break;
 	case SX_CMD_PARAM_SET:		sx_cmdParamSet(&r); break;
 	case SX_CMD_ECHO_SET:		sx_cmdEchoSet(&r); break;
+	case SX_CMD_FX_FREEZE:		sx_cmdFxFreeze(&r); break;
 	default:					sx_nak(f->cmd, SX_ERR_UNKNOWN_CMD, 0); break;
 	}
 }

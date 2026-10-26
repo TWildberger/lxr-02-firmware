@@ -129,6 +129,17 @@ static void test_writer_doc_examples(void)
 	sxw_u14(&w, 100);
 	n = sxw_end(&w);
 	CHECK_BYTES(buf, n, 0xF0, 0x7D, 0x4C, 0x7F, 0x01, 0x41, 0x03, 0x00, 0x64, 0x00, 0x58, 0xF7);
+
+	// freeze FX: engage at 1/16, then release
+	CHECK(SX_CMD_FX_FREEZE == 0x46);
+	sxw_begin(&w, buf, sizeof(buf), 0x7F, SX_CMD_FX_FREEZE);
+	sxw_u7(&w, 5);
+	n = sxw_end(&w);
+	CHECK_BYTES(buf, n, 0xF0, 0x7D, 0x4C, 0x7F, 0x01, 0x46, 0x05, 0x3D, 0xF7);
+	sxw_begin(&w, buf, sizeof(buf), 0x7F, SX_CMD_FX_FREEZE);
+	sxw_u7(&w, 0);
+	n = sxw_end(&w);
+	CHECK_BYTES(buf, n, 0xF0, 0x7D, 0x4C, 0x7F, 0x01, 0x46, 0x00, 0x38, 0xF7);
 }
 //---------------------------------------------------------------------------
 static void test_writer_fields(void)
