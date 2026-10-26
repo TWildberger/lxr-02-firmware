@@ -107,13 +107,16 @@ cannot turn an engine on. See [file-formats.md](file-formats.md) and
 Same-toolchain release comparison against freeze commit
 `c53feecdaaa1727cd922a37c5a30488499b80e53`, using the existing CMake release
 preset and Arm GNU 15.3.Rel2 (15.3.1). Linker region usage includes alignment/stubs:
+The after build includes the rebase onto freeze capability commit
+`9500caf3203be01f26464c381e4f2dae58b227b8`; the before column retains the
+original freeze baseline measured above.
 
 | Region | Before (bytes) | After (bytes) | Delta | Capacity |
 |--------|----------------|---------------|-------|----------|
 | ITCM | 14864 | 14984 | +120 | 16384 |
 | DTCM | 107752 | 107824 | +72 | 131072 |
 | General RAM | 279000 | 279000 | 0 | 393216 |
-| Flash region | 256900 | 258716 | +1816 | 1015808 |
+| Flash region | 256900 | 258724 | +1824 | 1015808 |
 
 The per-voice state adds 72 bytes total; engine selectors fit existing struct
 padding. `FX_BUFFER` remains exclusively FX-owned. No new buffer or wavetable is
