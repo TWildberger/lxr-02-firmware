@@ -107,6 +107,7 @@ add_library(lxr_dsp OBJECT
 add_library(lxr_engine OBJECT
     Src/Soundengine/AudioCodecManager.c
     Src/Soundengine/cs4344_cs5343.c
+    Src/Soundengine/CpuMeter.c
     Src/Soundengine/FIFO.c
     Src/Soundengine/FxBus.c
     Src/Soundengine/Soundengine.c

@@ -17,17 +17,20 @@
 #include <string.h>
 #include "Soundengine/USB/usb_manager.h"
 #include "Soundengine/MIDI/Uart.h"
+#include "Soundengine/CpuMeter.h"
 
 uint8_t soundengine_calcNextSampleBlock()
 {
 	if(bCurrentSampleValid!= SAMPLE_VALID)
 	{
+		const uint32_t cpuStart = CPU_METER_NOW();
 	#if USE_DAC2
 		mixer_calcNextSampleBlock((int16_t*)&dma_buffer[bCurrentSampleValid*(OUTPUT_DMA_SIZE*2)],(int16_t*)&dma_buffer2[bCurrentSampleValid*(OUTPUT_DMA_SIZE*2)]);
 	#else
 		mixer_calcNextSampleBlock(&dma_buffer[bCurrentSampleValid*(OUTPUT_DMA_SIZE*2)],&dma_buffer2[(1-bCurrentSampleValid)*(OUTPUT_DMA_SIZE*2)]);
 	#endif
 		bCurrentSampleValid = SAMPLE_VALID;
+		cpuMeter_blockDone(&cpuMeter, CPU_METER_NOW() - cpuStart);
 
 		return 1;
 	}
@@ -37,6 +40,9 @@ uint8_t soundengine_calcNextSampleBlock()
 
 void soundengine_init()
 {
+	// cycles available per audio block = 100 % render load
+	cpuMeter_init(&cpuMeter, (uint32_t)((float)SystemCoreClock * OUTPUT_DMA_SIZE / REAL_FS + 0.5f));
+
 	mixer_init();
 
 

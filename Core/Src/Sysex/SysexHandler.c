@@ -27,6 +27,7 @@
 #include "Soundengine/MIDI/MidiParser.h"
 #include "Soundengine/MIDI/Uart.h"
 #include "Soundengine/USB/usb_manager.h"
+#include "Soundengine/CpuMeter.h"
 #include "frontPanelParser_ui.h"
 
 #ifndef LXR_FW_MAJOR
@@ -69,6 +70,7 @@
 #define CAP_PARAMS			(1 << 3)
 #define CAP_ECHO			(1 << 4)
 #define CAP_SAVE			(1 << 5)
+#define CAP_CPU_METER		(1 << 6)
 
 _Static_assert(sizeof(Step) == 7, "pattern layout changed");
 _Static_assert(sizeof(StepTiming) == 1, "pattern layout changed");
@@ -452,7 +454,7 @@ static void sx_cmdIdentity(void)
 	sxw_u7(&sx_w, NUM_STEPS);
 	sxw_u14(&sx_w, PATTERN_DATA_LEN);
 	sxw_u14(&sx_w, SX_MAX_FRAME);
-	sxw_u14(&sx_w, CAP_KITS | CAP_PATTERNS | CAP_GLOBALS | CAP_PARAMS | CAP_ECHO | CAP_SAVE);
+	sxw_u14(&sx_w, CAP_KITS | CAP_PATTERNS | CAP_GLOBALS | CAP_PARAMS | CAP_ECHO | CAP_SAVE | CAP_CPU_METER);
 	sxw_u7(&sx_w, sx_ownDevByte());
 	sxw_u7(&sx_w, activeParameters[PAR_SYSEX_ECHO] ? 1 : 0);
 	sx_send(sx_replyPorts);
@@ -473,14 +475,31 @@ static void sx_cmdUniversalIdentity(void)
 	sx_txPending = sx_replyPorts;
 }
 //---------------------------------------------------------------------------
-static void sx_cmdStatus(void)
+static void sx_cmdStatus(SxReader *r)
 {
+	// optional flags byte (SX_STATUS_*), an empty payload means no flags
+	const uint8_t flags = sxr_remaining(r) ? sxr_u7(r) : 0;
+
+	CpuMeterReport cpu;
+	cpuMeter_report(&cpuMeter, &cpu);
+	const SxStatus st = {
+		.kit = menu_loadedPresetNr[CURRENT_KIT],
+		.pattern = seq_activePattern,
+		.running = seq_isRunning() ? 1 : 0,
+		.echo = activeParameters[PAR_SYSEX_ECHO] ? 1 : 0,
+		.cpuNow = cpu.now,
+		.cpuPeak = cpu.peak,
+		.cpuVoices = cpu.section[CPU_SECTION_VOICES],
+		.cpuMixer = cpu.section[CPU_SECTION_MIXER],
+		.cpuFx = cpu.section[CPU_SECTION_FX],
+		.underruns = cpu.underruns,
+	};
 	sx_begin(SX_CMD_STATUS_REPLY);
-	sxw_u7(&sx_w, menu_loadedPresetNr[CURRENT_KIT]);
-	sxw_u7(&sx_w, seq_activePattern);
-	sxw_u7(&sx_w, seq_isRunning() ? 1 : 0);
-	sxw_u7(&sx_w, activeParameters[PAR_SYSEX_ECHO] ? 1 : 0);
+	sx_writeStatus(&sx_w, &st);
 	sx_send(sx_replyPorts);
+
+	if(flags & SX_STATUS_RESET_PEAK)
+		cpuMeter_resetPeak(&cpuMeter);
 }
 //---------------------------------------------------------------------------
 static void sx_cmdKitRequest(SxReader *r)
@@ -828,7 +847,7 @@ static void sx_dispatch(const SxFrame *f)
 	switch(f->cmd)
 	{
 	case SX_CMD_IDENTITY_REQ:	sx_cmdIdentity(); break;
-	case SX_CMD_STATUS_REQ:		sx_cmdStatus(); break;
+	case SX_CMD_STATUS_REQ:		sx_cmdStatus(&r); break;
 	case SX_CMD_KIT_REQ:		sx_cmdKitRequest(&r); break;
 	case SX_CMD_KIT_DUMP:		sx_cmdKitDump(&r); break;
 	case SX_CMD_KIT_STORE:		sx_cmdKitStore(&r); break;

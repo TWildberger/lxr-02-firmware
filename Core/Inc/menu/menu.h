@@ -273,6 +273,12 @@ enum NamesEnum
 	TEXT_SYSEX_ENABLE,
 	TEXT_SYSEX_DEVICE_ID,
 	TEXT_SYSEX_ECHO,
+	TEXT_CPU_NOW,		// read-only CPU meter entries, see docs/performance.md
+	TEXT_CPU_PEAK,
+	TEXT_CPU_VOICES,
+	TEXT_CPU_MIXER,
+	TEXT_CPU_FX,
+	TEXT_CPU_XRUNS,
 
 
 	NUM_NAMES
@@ -385,7 +391,13 @@ enum shortNamesEnum
 	SHORT_SHIFT,
 	SHORT_SYSEX,
 	SHORT_DEVICE_ID,
-	SHORT_ECHO
+	SHORT_ECHO,
+	SHORT_CPU,
+	SHORT_PEAK,
+	SHORT_VOICES,
+	SHORT_MIXER,
+	SHORT_FX,
+	SHORT_XRUNS
 	
 };
 //-----------------------------------------------------------------
@@ -420,7 +432,8 @@ enum catNamesEnum
 	CAT_GENERATOR,
 	CAT_MIDI,
 	CAT_CLOCK,
-	CAT_FX
+	CAT_FX,
+	CAT_CPU
 };
 //-----------------------------------------------------------------
 // these must correspond with longNames in MenuText.h
@@ -516,7 +529,13 @@ enum longNamesEnum
 	LONG_SHIFT,
 	LONG_SYSEX,
 	LONG_DEVICE_ID,
-	LONG_ECHO
+	LONG_ECHO,
+	LONG_CPU_NOW,
+	LONG_CPU_PEAK,
+	LONG_VOICES,
+	LONG_MIXER,
+	LONG_FX,
+	LONG_XRUNS
 	
 };
 
@@ -657,6 +676,8 @@ void menu_repaintAll();
 //-----------------------------------------------------------------
 //repaint the screen. show all changes*/
 void menu_repaint();
+//refresh the read-only CPU meter page while it is shown, call from the main loop
+void menu_cpuMeterTick();
 //-----------------------------------------------------------------
 //For nonblocking display refreshs
 void menu_tick();

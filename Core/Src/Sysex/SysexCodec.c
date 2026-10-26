@@ -9,6 +9,8 @@
  */
 #include "Sysex/SysexCodec.h"
 
+#include <string.h>
+
 #define SX_START	0xF0
 #define SX_END		0xF7
 
@@ -255,4 +257,37 @@ void sx_kitApply(uint8_t *dst, uint16_t dstLen, const uint8_t *src, uint16_t n,
 		if(modIdx[i] < dstLen && dst[modIdx[i]] >= numModTargets)
 			dst[modIdx[i]] = 0;
 	}
+}
+//---------------------------------------------------------------------------
+void sx_writeStatus(SxWriter *w, const SxStatus *s)
+{
+	sxw_u7(w, s->kit);
+	sxw_u7(w, s->pattern);
+	sxw_u7(w, s->running);
+	sxw_u7(w, s->echo);
+	sxw_u14(w, s->cpuNow);
+	sxw_u14(w, s->cpuPeak);
+	sxw_u14(w, s->cpuVoices);
+	sxw_u14(w, s->cpuMixer);
+	sxw_u14(w, s->cpuFx);
+	sxw_u14(w, s->underruns);
+}
+//---------------------------------------------------------------------------
+int8_t sx_readStatus(SxReader *r, SxStatus *s)
+{
+	memset(s, 0, sizeof(*s));
+	s->kit = sxr_u7(r);
+	s->pattern = sxr_u7(r);
+	s->running = sxr_u7(r);
+	s->echo = sxr_u7(r);
+	if(r->err) return -1;
+	if(sxr_remaining(r) < 12) return 0;
+	s->hasCpu = 1;
+	s->cpuNow = sxr_u14(r);
+	s->cpuPeak = sxr_u14(r);
+	s->cpuVoices = sxr_u14(r);
+	s->cpuMixer = sxr_u14(r);
+	s->cpuFx = sxr_u14(r);
+	s->underruns = sxr_u14(r);
+	return 0;
 }

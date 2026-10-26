@@ -159,6 +159,34 @@ void sxa_reset(SxAssembler *a);
 SxAsmResult sxa_feed(SxAssembler *a, uint8_t byte);
 
 //---------------------------------------------------------------------------
+// STATUS_REPLY payload
+
+// STATUS_REQUEST flags (optional u7 payload)
+#define SX_STATUS_RESET_PEAK	0x01	// clear CPU peak and underruns after replying
+
+typedef struct {
+	uint8_t kit;
+	uint8_t pattern;
+	uint8_t running;
+	uint8_t echo;
+	// CPU meter, see docs/performance.md. Loads in 1/10 % of the audio block time.
+	uint8_t hasCpu;		// reader: 1 if the reply contained the CPU fields
+	uint16_t cpuNow;
+	uint16_t cpuPeak;
+	uint16_t cpuVoices;
+	uint16_t cpuMixer;
+	uint16_t cpuFx;
+	uint16_t underruns;
+} SxStatus;
+
+// writes all STATUS_REPLY fields (the CPU fields are always written, hasCpu is ignored)
+void sx_writeStatus(SxWriter *w, const SxStatus *s);
+// reads a STATUS_REPLY payload. Replies from firmware without the CPU meter
+// end after the first four fields; then hasCpu is 0 and the CPU fields are 0.
+// Extra trailing bytes are ignored. Returns 0, or -1 if the payload is too short.
+int8_t sx_readStatus(SxReader *r, SxStatus *s);
+
+//---------------------------------------------------------------------------
 // Kit data
 
 // Applies received kit parameter bytes the way the SD loader

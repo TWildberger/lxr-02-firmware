@@ -967,6 +967,7 @@ lcd_process_display_interrupt = 1;
 	  soundengine_process();
 	//  menu_tick();
 	  screensaver_check();
+	  menu_cpuMeterTick();
 	//  menu_tick();
   checkMainLoc = -10;
 

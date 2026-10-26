@@ -483,6 +483,12 @@ const char shortNames[][4]  =
 	{"syx"},
 	{"id"},
 	{"ech"},
+	{"cpu"},
+	{"pk"},
+	{"vce"},
+	{"mix"},
+	{"fx"},
+	{"xrn"},
 
 };
 //-----------------------------------------------------------------
@@ -519,6 +525,7 @@ const char catNames[][16] =
 	{"MIDI"},
 	{"Clock"},
 	{"Fx"},
+	{"CPU"},
 };
 //-----------------------------------------------------------------
 // these must correspond to longNamesEnum
@@ -616,6 +623,12 @@ const char longNames[][16] =
 	{"SysEx"},
 	{"DeviceID"},
 	{"ParmEcho"},
+	{"Load"},
+	{"Peak"},
+	{"Voices"},
+	{"Mixer"},
+	{"FX"},
+	{"XRuns"},
 };
 
 
