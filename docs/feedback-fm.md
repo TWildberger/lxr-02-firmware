@@ -132,6 +132,22 @@ replaces the old pair of oscillator renders; it is a conservative planning
 allowance, not a worst-case execution-time proof. Cache misses, modulation,
 interrupts and UI/SD contention still need on-device measurement.
 
+### Preliminary hardware check (exploratory only)
+
+An approximately 8-second USB-MIDI check on firmware 1.7-sx (`0x07FF`
+capabilities) used kit 16 (`TKit1`), FX off, sequencer stopped, and all seven
+voices triggered, with `fbm` selected for Drum 1–3 using the example settings
+above. Against the same-session all-old reference, `now` load rose 0.1–0.4
+percentage points across idle, 16ths at 120 BPM, and 20/5 ms retriggers; voices
+load rose 0.1–0.4 points. Peak was at most 61.9%, with zero xruns. Parameters
+were set live only (no save), then all original values were restored and
+verified with `PARAM_GET`. See the [scenario readings and full
+qualification](performance.md#preliminary-feedback-fm-cpu-check-exploratory).
+
+This is preliminary, not the required five-minute acceptance run or broad
+all-six-voices/modulation/FX stress scenario. The acceptance checklist below
+remains pending.
+
 Using the supplied hardware baseline of 52-53% voices, about 5% mixer and
 11.5% plate (6.7% Eco), budget up to **79% steady total with plate**, or about
 **88% against the observed 78% FX-switch peak**. With freeze instead of plate,

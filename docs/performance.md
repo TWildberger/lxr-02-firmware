@@ -120,6 +120,37 @@ measured.
 
 Firmware: `2f179b5` · Image SHA-256: `46b8f317…` · Date: 2026-10-25 · Kit: `TKit1` (slot 16)
 
+## Preliminary feedback-FM CPU check (exploratory)
+
+Short exploratory check on the loaded 1.7-sx firmware (`IDENTITY_REPLY`
+capabilities `0x07FF`), over USB MIDI with kit 16 (`TKit1`), sequencer stopped
+and FX off. All seven voices were triggered; in the FM phase, voices 1–3 used
+`fbm` with the documented examples: engine IDs 221–223 = 1, timbre decay
+224–226 = 15/45/95, FM amount 82/84/86 = 35/80/100, frequency 83/85/87 =
+33/64/76, and feedback 228–230 = 10/40/85. These were live-only `PARAM_SET`
+changes with no `SAVE`. The same-session legacy reference immediately before
+used all-old engines. Each phase lasted about 8 seconds; peak/xruns were reset
+for each scenario. The 15 changed live values were restored exactly and
+verified with `PARAM_GET`.
+
+Values are percent of audio-block time, shown as `now / peak / voices / mixer /
+fx / xruns`. This is not the required five-minute acceptance run or the broad
+all-six-voices, modulation and FX scenario; interpret the short comparison as
+preliminary only.
+
+| Scenario | Three `fbm` drums | All-old reference |
+|----------|------------------:|------------------:|
+| Idle, sequencer stopped | 57.9 / 58.4 / 52.3 / 5.4 / 0.1 / 0 | 57.5 / 58.2 / 51.9 / 5.4 / 0.2 / 0 |
+| 7 voices on 16ths at 120 BPM | 58.7 / 60.1 / 53.1 / 5.4 / 0.2 / 0 | 58.3 / 59.7 / 52.8 / 5.4 / 0.1 / 0 |
+| 7 voices retriggered every 20 ms | 59.2 / 61.9 / 53.6 / 5.4 / 0.2 / 0 | 58.9 / 61.1 / 53.4 / 5.4 / 0.2 / 0 |
+| 7 voices retriggered every 5 ms | 59.1 / 61.3 / 53.5 / 5.4 / 0.2 / 0 | 59.0 / 61.7 / 53.4 / 5.4 / 0.1 / 0 |
+
+There were no xruns in these phases. The `now` delta versus the immediate
+all-old reference was +0.1 to +0.4 percentage points, and voices load was
++0.1 to +0.4 points. These short observations do not establish worst-case FM
+cost or realtime headroom; the full [feedback-FM hardware acceptance
+checklist](feedback-fm.md#hardware-acceptance-checklist) remains pending.
+
 ## Sequencer conditions and beat-repeat resources
 
 Same-toolchain release builds of the FM base
