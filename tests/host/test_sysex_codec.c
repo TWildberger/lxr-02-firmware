@@ -358,6 +358,96 @@ static void test_end_to_end(void)
 	CHECK(sx_parseFrame(a.buf, a.len, &f) == SX_PARSE_BAD_CHECKSUM);
 }
 //---------------------------------------------------------------------------
+// KIT_DUMP host -> device -> host must be byte-exact, like loading a .snd file:
+// out-of-range values (factory kits contain e.g. 24, 89, 5 where the menu
+// would clamp) are kept; only invalid mod-target indices become 0.
+#define KIT_N		247
+#define KIT_NAME	8
+static int kit_dumpAndParse(const uint8_t *data, uint16_t n, uint8_t slot, uint8_t *out, uint16_t outSize)
+{
+	static SxAssembler a;
+	uint8_t frame[SX_MAX_FRAME];
+	SxWriter w;
+	sxw_begin(&w, frame, sizeof(frame), 0x7F, SX_CMD_KIT_DUMP);
+	sxw_u7(&w, slot);
+	sxw_u7(&w, 0);
+	sxw_u14(&w, n);
+	sxw_packed(&w, data, (uint16_t)(KIT_NAME + n));
+	const uint16_t len = sxw_end(&w);
+	if(!len) return -1;
+
+	sxa_reset(&a);
+	int frames = 0;
+	if(feed_all(&a, frame, len, &frames) != SXA_FRAME) return -1;
+	SxFrame f;
+	if(sx_parseFrame(a.buf, a.len, &f) != SX_PARSE_OK || f.cmd != SX_CMD_KIT_DUMP) return -1;
+	SxReader r;
+	sxr_init(&r, f.payload, f.payloadLen);
+	if(sxr_u7(&r) != slot || sxr_u7(&r) != 0 || sxr_u14(&r) != n || r.err) return -1;
+	return sx_unpack(sxr_ptr(&r), sxr_remaining(&r), out, outSize);
+}
+
+static void test_kit_roundtrip(void)
+{
+	// PAR_VEL_DEST_1..6, PAR_TARGET_LFO1..6 (see params.json)
+	static const uint16_t modIdx[] = { 149, 150, 151, 152, 153, 154, 167, 168, 169, 170, 171, 172 };
+	const uint8_t nmt = 120;
+
+	uint8_t kit[KIT_NAME + KIT_N];
+	memcpy(kit, "FACTORY1", KIT_NAME);
+	for(int i = 0; i < KIT_N; i++) kit[KIT_NAME + i] = (uint8_t)(i * 13 + 7);
+	uint8_t *params = &kit[KIT_NAME];
+	// out-of-range for the menu, must survive unchanged
+	params[10] = 24; params[11] = 89; params[12] = 5; params[13] = 0xFF; params[14] = 0x80;
+	// mod targets: valid, last valid, first invalid, way out of range
+	for(int i = 0; i < 12; i++) params[modIdx[i]] = (uint8_t)i;
+	params[modIdx[1]] = nmt - 1;
+	params[modIdx[2]] = nmt;
+	params[modIdx[7]] = 0xFF;
+
+	// host -> device
+	uint8_t rx[KIT_NAME + KIT_N + 8];
+	CHECK(kit_dumpAndParse(kit, KIT_N, 5, rx, sizeof(rx)) == KIT_NAME + KIT_N);
+	CHECK(memcmp(rx, kit, sizeof(kit)) == 0);
+
+	uint8_t slot[KIT_N];
+	memset(slot, 0xAA, sizeof(slot));
+	sx_kitApply(slot, KIT_N, &rx[KIT_NAME], KIT_N, modIdx, 12, nmt);
+
+	uint8_t expect[KIT_N];
+	memcpy(expect, params, KIT_N);
+	expect[modIdx[2]] = 0;
+	expect[modIdx[7]] = 0;
+	CHECK(memcmp(slot, expect, KIT_N) == 0);
+	CHECK(slot[10] == 24 && slot[11] == 89 && slot[12] == 5 && slot[13] == 0xFF && slot[14] == 0x80);
+	CHECK(slot[modIdx[1]] == nmt - 1);
+
+	// device -> host returns exactly what was stored
+	uint8_t back[KIT_NAME + KIT_N];
+	memcpy(back, kit, KIT_NAME);
+	memcpy(&back[KIT_NAME], slot, KIT_N);
+	uint8_t rx2[KIT_NAME + KIT_N + 8];
+	CHECK(kit_dumpAndParse(back, KIT_N, 0x7F, rx2, sizeof(rx2)) == KIT_NAME + KIT_N);
+	CHECK(memcmp(&rx2[KIT_NAME], expect, KIT_N) == 0);
+
+	// a second pass changes nothing (idempotent, like reloading the .snd)
+	uint8_t again[KIT_N];
+	memcpy(again, slot, KIT_N);
+	sx_kitApply(again, KIT_N, slot, KIT_N, modIdx, 12, nmt);
+	CHECK(memcmp(again, slot, KIT_N) == 0);
+
+	// short dump: bytes >= n keep their old value, n > dstLen is truncated
+	uint8_t part[KIT_N];
+	memset(part, 0x33, sizeof(part));
+	sx_kitApply(part, KIT_N, params, 100, modIdx, 12, nmt);
+	CHECK(memcmp(part, params, 100) == 0);
+	CHECK(part[100] == 0x33 && part[KIT_N - 1] == 0x33);
+	CHECK(part[modIdx[0]] == 0x33); // below nmt, untouched
+	uint8_t small[4] = { 9, 9, 9, 9 };
+	sx_kitApply(small, 3, params, KIT_N, modIdx, 12, nmt);
+	CHECK(memcmp(small, params, 3) == 0 && small[3] == 9);
+}
+//---------------------------------------------------------------------------
 int main(void)
 {
 	test_pack_example();
@@ -373,6 +463,7 @@ int main(void)
 	test_reader();
 	test_assembler();
 	test_end_to_end();
+	test_kit_roundtrip();
 
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;

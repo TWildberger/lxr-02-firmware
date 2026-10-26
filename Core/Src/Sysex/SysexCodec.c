@@ -243,3 +243,16 @@ SxAsmResult sxa_feed(SxAssembler *a, uint8_t byte)
 	}
 	return SXA_NONE;
 }
+//---------------------------------------------------------------------------
+void sx_kitApply(uint8_t *dst, uint16_t dstLen, const uint8_t *src, uint16_t n,
+		const uint16_t *modIdx, uint8_t numModIdx, uint8_t numModTargets)
+{
+	const uint16_t count = n < dstLen ? n : dstLen;
+	for(uint16_t i = 0; i < count; i++)
+		dst[i] = src[i];
+	for(uint8_t i = 0; i < numModIdx; i++)
+	{
+		if(modIdx[i] < dstLen && dst[modIdx[i]] >= numModTargets)
+			dst[modIdx[i]] = 0;
+	}
+}

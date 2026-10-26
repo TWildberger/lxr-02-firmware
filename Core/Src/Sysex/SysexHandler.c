@@ -325,6 +325,16 @@ static uint8_t sx_clampValue(uint16_t id, uint16_t value)
 	return menu_clampParamValue(id, value);
 }
 //---------------------------------------------------------------------------
+// the indices preset_readDrumsetData validates when loading a .snd file
+static const uint16_t sx_kitModIdx[] = {
+	PAR_VEL_DEST_1, PAR_VEL_DEST_1 + 1, PAR_VEL_DEST_1 + 2,
+	PAR_VEL_DEST_1 + 3, PAR_VEL_DEST_1 + 4, PAR_VEL_DEST_1 + 5,
+	PAR_TARGET_LFO1, PAR_TARGET_LFO1 + 1, PAR_TARGET_LFO1 + 2,
+	PAR_TARGET_LFO1 + 3, PAR_TARGET_LFO1 + 4, PAR_TARGET_LFO1 + 5,
+};
+_Static_assert(PAR_VEL_DEST_6 == PAR_VEL_DEST_1 + 5, "velocity targets must be contiguous");
+_Static_assert(PAR_TARGET_LFO6 == PAR_TARGET_LFO1 + 5, "LFO targets must be contiguous");
+//---------------------------------------------------------------------------
 static void sx_copyName(char *dst, const uint8_t *src)
 {
 	for(uint8_t i = 0; i < NAME_LEN; i++)
@@ -519,13 +529,14 @@ static void sx_cmdKitDump(SxReader *r)
 	const int32_t rawLen = sx_unpack(sxr_ptr(r), sxr_remaining(r), sx_scratch, sizeof(sx_scratch));
 	if(rawLen < 0 || rawLen < (int32_t)(NAME_LEN + n)) { sx_nak(SX_CMD_KIT_DUMP, SX_ERR_LENGTH, slot); return; }
 
-	const uint16_t count = n < END_OF_SOUND_PARAMETERS ? n : END_OF_SOUND_PARAMETERS;
+	// byte-exact like an SD kit load, only invalid mod-target indices are reset
 	const uint8_t *values = &sx_scratch[NAME_LEN];
+	const uint8_t nmt = getNumModTargets();
+	const uint8_t numModIdx = (uint8_t)(sizeof(sx_kitModIdx) / sizeof(sx_kitModIdx[0]));
 
 	if(slot == 0x7F)
 	{
-		for(uint16_t i = 0; i < count; i++)
-			activeParameters[i] = sx_clampValue(i, values[i]);
+		sx_kitApply(activeParameters, END_OF_SOUND_PARAMETERS, values, n, sx_kitModIdx, numModIdx, nmt);
 		preset_sendDrumsetParameters();
 		menu_editBufferReplaced();
 		preset_touchTimer(PRESET_KIT_TIMER);
@@ -533,8 +544,7 @@ static void sx_cmdKitDump(SxReader *r)
 	}
 	else
 	{
-		for(uint16_t i = 0; i < count; i++)
-			mainParameters[slot][i] = sx_clampValue(i, values[i]);
+		sx_kitApply(mainParameters[slot], END_OF_SOUND_PARAMETERS, values, n, sx_kitModIdx, numModIdx, nmt);
 		sx_copyName(savefileNames[slot][KIT_NAMES], sx_scratch);
 		if(flags & SX_FLAG_SAVE)
 		{

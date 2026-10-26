@@ -252,8 +252,14 @@ Host → device:
   the SD card as `.snd`.
 * If *n* is less than 247, parameters ≥ *n* keep their old value. If *n* is
   greater than 247, the extra values are ignored.
-* Every value is clamped to the parameter's legal range (same limits as the
-  front panel). Modulation-target indices beyond the target table become 0.
+* Values are stored **byte-exact**, exactly like loading the `.snd` file from
+  SD: they are **not** clamped to the front-panel range (factory kits contain
+  such values, e.g. hi-hat transient wave 24 or 89, FX type 5, and clamping
+  would change how they sound). The only change is the one the SD loader also
+  makes: a velocity or LFO modulation target (`PAR_VEL_DEST_1`–`6`,
+  `PAR_TARGET_LFO1`–`6`) that is beyond the device's target table becomes 0.
+  A later `KIT_REQUEST` therefore returns the same bytes that were sent,
+  apart from such targets. (`PARAM_SET` and `GLOBALS_DUMP` still clamp.)
 * Reply: `ACK(11, slot)`, or `NAK` (`ERR_LENGTH` if the data is shorter than
   `8 + n` bytes, `ERR_RANGE` for a bad slot, `ERR_SD` if saving failed).
 
@@ -264,8 +270,8 @@ Host → device:
 | slot | u7 (`00`–`3F`) |
 | flags | u7 |
 
-Copies the edit buffer into the slot and makes it the current kit. This is the
-same as *save kit* on the device. The slot takes the name of the current kit
+Copies the edit buffer into the slot byte for byte and makes it the current
+kit. This is the same as *save kit* on the device. The slot takes the name of the current kit
 (rename it with `KIT_NAME` before or after). With `SAVE`, the `.snd` file is
 written too. Reply `ACK(12, slot)`.
 

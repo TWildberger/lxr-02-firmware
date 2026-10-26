@@ -158,4 +158,16 @@ typedef struct {
 void sxa_reset(SxAssembler *a);
 SxAsmResult sxa_feed(SxAssembler *a, uint8_t byte);
 
+//---------------------------------------------------------------------------
+// Kit data
+
+// Applies received kit parameter bytes the way the SD loader
+// (preset_readDrumsetData) treats a .snd file. The first min(n, dstLen)
+// bytes are copied unchanged, then each modulation-target index listed in
+// modIdx that is >= numModTargets is set to 0. Other values are NOT clamped,
+// so a kit sounds the same whether it came from SD or over SysEx.
+// dst bytes at positions >= n keep their old value.
+void sx_kitApply(uint8_t *dst, uint16_t dstLen, const uint8_t *src, uint16_t n,
+		const uint16_t *modIdx, uint8_t numModIdx, uint8_t numModTargets);
+
 #endif /* SYSEX_CODEC_H_ */
