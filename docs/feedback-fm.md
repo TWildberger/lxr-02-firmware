@@ -141,13 +141,16 @@ engine; snare/cymbal/hat keep their old cost. This leaves an estimated 12-point
 transient margin, but **safe headroom is provisional until measured**.
 Do not enable additional engines or FX in this layer.
 
-### Hardware acceptance checklist (not yet run)
+### Hardware acceptance checklist (partially validated)
 
-Three five-minute workloads with all three feedback-FM engines enabled in the
-live edit buffer were measured on hardware, with FX off, plate reverb and Eco
-reverb; an exploratory 30-second freeze-path check was also run. See the
-[hardware results](performance.md#feedback-fm-long-run-measurement). These
-measurements do not complete the broader acceptance checks below.
+Four five-minute workloads with all three feedback-FM engines enabled in the
+live edit buffer were measured on hardware: FX off, plate, Eco and continuously
+engaged 1/16 freeze. An exploratory 30-second freeze-path check and sequencer
+condition/beat-repeat protocol checks were also run. See the
+[hardware results](performance.md#feedback-fm-long-run-measurement) and
+[sequencer protocol checks](performance.md#hardware-protocol-checks). These do
+not complete the broader acceptance checks below; in particular, no audio was
+captured or auditioned and no sequencer playback behavior was validated.
 
 1. Back up the SD card, flash the release image, and compare representative
    factory/user kits against the freeze build with `eng=old`, including kits
@@ -155,14 +158,17 @@ measurements do not complete the broader acceptance checks below.
 2. Audition the three example sounds, minimum/maximum pitch, index, feedback,
    amp/filter settings, MIDI velocity, pitch sweeps, fast retriggers and choke.
    Check tails, DC/clicks, clipping and usable perceived volume.
-3. Use all six voices, long tails and dense retriggers with all three drums on
-   `fbm`; repeat with plate, Eco and freeze separately. Reset CPU peak/xruns,
-   run at least five minutes each, then exercise FX switches, LFO modulation,
-   panel edits, SysEx traffic, kit morph and SD saves. Record now/peak and
-   section breakdown using [performance.md](performance.md).
-4. Require zero steady xruns and a worst-case peak below 90% for this budget.
-   If not met, keep `eng=old` or use Eco/off until the loop is optimized and
-   the same workload is remeasured. A host benchmark cannot establish safety.
+3. The initial five-minute all-three-`fbm` workloads with FX off, plate, Eco
+   and engaged 1/16 freeze have been measured; see
+   [performance.md](performance.md). Complete the remaining acceptance
+   coverage: exercise FX switches, LFO modulation, panel edits, SysEx traffic,
+   kit morph and SD saves, and capture/review audio for clicks, timing and
+   audibility. Other freeze lengths, pitch/gate/tape-stop, clock behavior and
+   switching remain untested.
+4. The four measured conditions had zero xruns and peaks below 90%; require
+   the same for remaining workloads. If not met, keep `eng=old` or use Eco/off
+   until the loop is optimized and the same workload is remeasured. A
+   host benchmark cannot establish safety.
 5. Save/reload a new-engine kit, power-cycle autosave, copy to a different slot,
    morph to/from a legacy kit, and round-trip both slot and edit-buffer SysEx.
    Confirm `EngV01` survives and every control returns. Confirm old 255-byte
