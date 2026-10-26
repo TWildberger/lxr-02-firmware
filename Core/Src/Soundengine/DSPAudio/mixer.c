@@ -24,6 +24,7 @@
 #include "Soundengine/TriggerOut.h"
 #include "menu/menu.h"
 #include "Soundengine/FxBus.h"
+#include "Soundengine/CpuMeter.h"
 
 	uint8_t r2_Available;
 	uint8_t l1_Available;
@@ -547,6 +548,7 @@ IN_ITCM_RAM static inline void mixer_addDataToOutput(uint8_t dest, const float p
 //-----------------------------------------------------------------------
 IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 {
+	CPU_METER_BEGIN();
 
 	r2_Available = (switch_r2_GPIO_Port->IDR & switch_r2_Pin)>0;
 	l1_Available = (switch_l1_GPIO_Port->IDR & switch_l1_Pin)>0;
@@ -581,6 +583,7 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	Snare_calcAsync();
 	Cymbal_calcAsync();
 	HiHat_calcAsync();
+	CPU_METER_LAP(CPU_SECTION_VOICES);
 
 	//calculate trigger io phase
 	//trigger_tickPhaseCounter();
@@ -597,9 +600,11 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	bufferTool_clearBuffer(output2,OUTPUT_DMA_SIZE*2);
 
 	bufferTool_clearBuffer(fxBusData,OUTPUT_DMA_SIZE*2);
+	CPU_METER_LAP(CPU_SECTION_MIXER);
 
 	//calc voice 1
 	calcDrumVoiceSyncBlock(0, sampleData,OUTPUT_DMA_SIZE);
+	CPU_METER_LAP(CPU_SECTION_VOICES);
 	//decimate voice
 	mixer_decimateBlock(0,sampleData);
 	//copy to selected dma buffer
@@ -623,8 +628,10 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 
 #if 1
 
+	CPU_METER_LAP(CPU_SECTION_MIXER);
 	//calc voice 2
 	calcDrumVoiceSyncBlock(1, sampleData,OUTPUT_DMA_SIZE);
+	CPU_METER_LAP(CPU_SECTION_VOICES);
 	//decimate voice
 	mixer_decimateBlock(1,sampleData);
 	//copy to selected dma buffer
@@ -643,8 +650,10 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #endif
 #endif
 #endif
+	CPU_METER_LAP(CPU_SECTION_MIXER);
 	//calc voice 3
 	calcDrumVoiceSyncBlock(2, sampleData,OUTPUT_DMA_SIZE);
+	CPU_METER_LAP(CPU_SECTION_VOICES);
 	//decimate voice
 	mixer_decimateBlock(2,sampleData);
 	//copy to selected dma buffer
@@ -662,8 +671,10 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #endif
 #endif
 #endif
+	CPU_METER_LAP(CPU_SECTION_MIXER);
 	//calc snare
 	Snare_calcSyncBlock(sampleData,OUTPUT_DMA_SIZE);
+	CPU_METER_LAP(CPU_SECTION_VOICES);
 	//decimate voice
 	mixer_decimateBlock(3,sampleData);
 	//copy to selected dma buffer
@@ -677,8 +688,10 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 	mixer_addDataToOutput(mixer_audioRouting[3],sqrtf((127-snareVoice.pan)/127.f), sqrtf(snareVoice.pan/127.f), sampleData,&output[pos],&output[pos+1],&output2[pos],&output2[pos+1], fxBusData);
 #endif
 #endif
+	CPU_METER_LAP(CPU_SECTION_MIXER);
 	//calc cymbal
 	Cymbal_calcSyncBlock(sampleData,OUTPUT_DMA_SIZE);
+	CPU_METER_LAP(CPU_SECTION_VOICES);
 	//decimate voice
 	mixer_decimateBlock(4,sampleData);
 	//copy to selected dma buffer
@@ -693,8 +706,10 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #endif
 
 
+	CPU_METER_LAP(CPU_SECTION_MIXER);
 	//calc HiHat
 	HiHat_calcSyncBlock(sampleData,OUTPUT_DMA_SIZE);
+	CPU_METER_LAP(CPU_SECTION_VOICES);
 	//decimate voice
 	mixer_decimateBlock(5,sampleData);
 	//copy to selected dma buffer
@@ -709,7 +724,9 @@ IN_ITCM_RAM void mixer_calcNextSampleBlock(int16_t* output,int16_t* output2)
 #endif
 
 #endif
+	CPU_METER_LAP(CPU_SECTION_MIXER);
 	FxBus_process(fxBusData,  &output[pos],&output[pos+1],&output2[pos],&output2[pos+1], OUTPUT_DMA_SIZE);
+	CPU_METER_LAP(CPU_SECTION_FX);
 /*
 	if(activeParameters[UNUSED_PAR_GLO_SAT])
 	{

@@ -448,6 +448,74 @@ static void test_kit_roundtrip(void)
 	CHECK(memcmp(small, params, 3) == 0 && small[3] == 9);
 }
 //---------------------------------------------------------------------------
+static void test_status(void)
+{
+	uint8_t buf[SX_MAX_FRAME];
+	SxWriter w;
+
+	// STATUS_REQUEST, without and with the reset flag (docs/sysex.md 5.4)
+	sxw_begin(&w, buf, sizeof(buf), 0x7F, SX_CMD_STATUS_REQ);
+	uint16_t n = sxw_end(&w);
+	CHECK_BYTES(buf, n, 0xF0, 0x7D, 0x4C, 0x7F, 0x01, 0x03, 0x7D, 0xF7);
+	sxw_begin(&w, buf, sizeof(buf), 0x7F, SX_CMD_STATUS_REQ);
+	sxw_u7(&w, SX_STATUS_RESET_PEAK);
+	n = sxw_end(&w);
+	CHECK_BYTES(buf, n, 0xF0, 0x7D, 0x4C, 0x7F, 0x01, 0x03, 0x01, 0x7C, 0xF7);
+
+	// STATUS_REPLY with CPU fields (golden frame, also in docs and tools/test_lxr_status.py)
+	const SxStatus st = {
+		.kit = 5, .pattern = 2, .running = 1, .echo = 0,
+		.cpuNow = 123, .cpuPeak = 1000, .cpuVoices = 80, .cpuMixer = 20, .cpuFx = 23,
+		.underruns = 3,
+	};
+	sxw_begin(&w, buf, sizeof(buf), 0x00, SX_CMD_STATUS_REPLY);
+	sx_writeStatus(&w, &st);
+	n = sxw_end(&w);
+	CHECK_BYTES(buf, n, 0xF0, 0x7D, 0x4C, 0x00, 0x01, 0x04, 0x05, 0x02, 0x01, 0x00,
+			0x7B, 0x00, 0x68, 0x07, 0x50, 0x00, 0x14, 0x00, 0x17, 0x00, 0x03, 0x00, 0x47, 0xF7);
+
+	SxFrame f;
+	CHECK(sx_parseFrame(buf, n, &f) == SX_PARSE_OK);
+	SxReader r;
+	sxr_init(&r, f.payload, f.payloadLen);
+	SxStatus got;
+	CHECK(sx_readStatus(&r, &got) == 0);
+	CHECK(got.hasCpu == 1);
+	CHECK(got.kit == 5 && got.pattern == 2 && got.running == 1 && got.echo == 0);
+	CHECK(got.cpuNow == 123 && got.cpuPeak == 1000 && got.cpuVoices == 80);
+	CHECK(got.cpuMixer == 20 && got.cpuFx == 23 && got.underruns == 3);
+	CHECK(!r.err);
+
+	// u14 limits survive
+	const SxStatus big = { .cpuNow = 16383, .cpuPeak = 16383, .underruns = 16383 };
+	sxw_begin(&w, buf, sizeof(buf), 0x00, SX_CMD_STATUS_REPLY);
+	sx_writeStatus(&w, &big);
+	n = sxw_end(&w);
+	CHECK(sx_parseFrame(buf, n, &f) == SX_PARSE_OK);
+	sxr_init(&r, f.payload, f.payloadLen);
+	CHECK(sx_readStatus(&r, &got) == 0);
+	CHECK(got.cpuNow == 16383 && got.cpuPeak == 16383 && got.underruns == 16383);
+
+	// reply of a v1 firmware without the CPU meter
+	const uint8_t legacy[] = { 0xF0, 0x7D, 0x4C, 0x00, 0x01, 0x04, 0x05, 0x02, 0x01, 0x00, 0x03, 0xF7 };
+	CHECK(sx_parseFrame(legacy, sizeof(legacy), &f) == SX_PARSE_OK);
+	sxr_init(&r, f.payload, f.payloadLen);
+	CHECK(sx_readStatus(&r, &got) == 0);
+	CHECK(got.hasCpu == 0 && got.kit == 5 && got.running == 1 && got.cpuNow == 0);
+
+	// partial CPU block is treated as absent, extra trailing bytes are ignored
+	const uint8_t partial[] = { 1, 2, 0, 1, 0x10, 0x00, 0x20 };
+	sxr_init(&r, partial, sizeof(partial));
+	CHECK(sx_readStatus(&r, &got) == 0 && got.hasCpu == 0 && got.echo == 1);
+	uint8_t longer[4 + 12 + 3] = { 1, 2, 0, 1, 0x7B, 0x00 };
+	sxr_init(&r, longer, sizeof(longer));
+	CHECK(sx_readStatus(&r, &got) == 0 && got.hasCpu == 1 && got.cpuNow == 123);
+
+	// too short
+	sxr_init(&r, partial, 3);
+	CHECK(sx_readStatus(&r, &got) == -1);
+}
+//---------------------------------------------------------------------------
 int main(void)
 {
 	test_pack_example();
@@ -464,6 +532,7 @@ int main(void)
 	test_assembler();
 	test_end_to_end();
 	test_kit_roundtrip();
+	test_status();
 
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;

@@ -32,6 +32,7 @@
 
 #include "Soundengine/Sequencer/sequencer.h"
 #include "Soundengine/Soundengine.h"
+#include "Soundengine/CpuMeter.h"
 
 
 uint8_t display_refresh_state = 0;
@@ -252,6 +253,12 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_SYSEX, CAT_MIDI, LONG_SYSEX},		/*TEXT_SYSEX_ENABLE*/
 		{SHORT_DEVICE_ID, CAT_MIDI, LONG_DEVICE_ID},/*TEXT_SYSEX_DEVICE_ID*/
 		{SHORT_ECHO, CAT_MIDI, LONG_ECHO},			/*TEXT_SYSEX_ECHO*/
+		{SHORT_CPU, CAT_CPU, LONG_CPU_NOW},			/*TEXT_CPU_NOW*/
+		{SHORT_PEAK, CAT_CPU, LONG_CPU_PEAK},		/*TEXT_CPU_PEAK*/
+		{SHORT_VOICES, CAT_CPU, LONG_VOICES},		/*TEXT_CPU_VOICES*/
+		{SHORT_MIXER, CAT_CPU, LONG_MIXER},			/*TEXT_CPU_MIXER*/
+		{SHORT_FX, CAT_CPU, LONG_FX},				/*TEXT_CPU_FX*/
+		{SHORT_XRUNS, CAT_CPU, LONG_XRUNS},			/*TEXT_CPU_XRUNS*/
 
 
 };
@@ -1516,6 +1523,85 @@ static void menu_displayModTargetShort(uint8_t curParmVal, char *valueAsText, ch
 }
 
 //-----------------------------------------------------------------
+// read-only CPU meter entries of the global menu, see docs/performance.md
+static uint8_t menu_isCpuMeterText(uint8_t textId)
+{
+	return (textId >= TEXT_CPU_NOW) && (textId <= TEXT_CPU_XRUNS);
+}
+//-----------------------------------------------------------------
+// right aligned decimal, space padded, clamped to the largest value that fits
+static void menu_putDigits(char *buf, uint8_t width, uint16_t v)
+{
+	uint16_t max = 9;
+	for(uint8_t i = 1; i < width; i++) max = (uint16_t)(max * 10 + 9);
+	if(v > max) v = max;
+	for(int8_t i = (int8_t)(width - 1); i >= 0; i--) {
+		buf[i] = (char)((v || i == width - 1) ? '0' + v % 10 : ' ');
+		v /= 10;
+	}
+}
+//-----------------------------------------------------------------
+// load in 1/10 % or the underrun count
+static uint16_t menu_cpuMeterValue(uint8_t textId)
+{
+	CpuMeterReport r;
+	cpuMeter_report(&cpuMeter, &r);
+	switch(textId)
+	{
+	case TEXT_CPU_PEAK:		return r.peak;
+	case TEXT_CPU_VOICES:	return r.section[CPU_SECTION_VOICES];
+	case TEXT_CPU_MIXER:	return r.section[CPU_SECTION_MIXER];
+	case TEXT_CPU_FX:		return r.section[CPU_SECTION_FX];
+	case TEXT_CPU_XRUNS:	return r.underruns;
+	default:				return r.now;
+	}
+}
+//-----------------------------------------------------------------
+// 3 characters: load as "d.d" percent below 10 %, whole percent above; xruns as count
+static void menu_cpuMeterText(uint8_t textId, char *buf)
+{
+	const uint16_t v = menu_cpuMeterValue(textId);
+	if(textId == TEXT_CPU_XRUNS) {
+		menu_putDigits(buf, 3, v);
+	} else if(v < 100) {
+		buf[0] = (char)('0' + v / 10);
+		buf[1] = '.';
+		buf[2] = (char)('0' + v % 10);
+	} else {
+		menu_putDigits(buf, 3, (uint16_t)((v + 5) / 10));
+	}
+}
+//-----------------------------------------------------------------
+// 6 characters for the edit view: " 12.3%" style load, or the full xrun count
+static void menu_cpuMeterTextLong(uint8_t textId, char *buf)
+{
+	uint16_t v = menu_cpuMeterValue(textId);
+	if(textId == TEXT_CPU_XRUNS) {
+		menu_putDigits(buf, 6, v);
+	} else {
+		if(v > 9999) v = 9999;
+		menu_putDigits(buf, 3, (uint16_t)(v / 10));
+		buf[3] = '.';
+		buf[4] = (char)('0' + v % 10);
+		buf[5] = '%';
+	}
+}
+//-----------------------------------------------------------------
+// main loop: refresh the CPU meter entries while they are shown
+void menu_cpuMeterTick()
+{
+	static uint32_t lastTick = 0;
+	const uint32_t now = HAL_GetTick();
+	if(now - lastTick < 250) return;
+	lastTick = now;
+
+	if(menu_activePage != MENU_MIDI_PAGE) return;
+	const uint8_t activeParameter	= menuIndex & MASK_PARAMETER;
+	const uint8_t activePage		= (menuIndex&MASK_PAGE)>>PAGE_SHIFT;
+	if(menu_isCpuMeterText(pgm_read_byte(&menuPages[MENU_MIDI_PAGE][activePage].top1 + activeParameter)))
+		menu_repaint();
+}
+//-----------------------------------------------------------------
 // paint the screen when in normal parameter edit mode
 // (as opposed to repainting the load save screen)
 void menu_repaintGeneric()
@@ -1573,7 +1659,11 @@ void menu_repaintGeneric()
 				(const char PROGMEM *)(&longNames[pgm_read_byte(&valueNames[parName].longName)]));
 
 			//Bottom row -> parameter value (set below)
-			switch(parameter_dtypes[parNr] & 0xFF)
+			if(menu_isCpuMeterText(parName))
+			{
+				menu_cpuMeterTextLong(parName, &editDisplayBuffer[1][10]);
+			}
+			else switch(parameter_dtypes[parNr] & 0xFF)
 			{
 			case DTYPE_TARGET_SELECTION_VELO: //switch(parameters_dtypes[parNr] & 0x0F)
 			case DTYPE_TARGET_SELECTION_LFO:
@@ -1704,7 +1794,10 @@ void menu_repaintGeneric()
 			curParmVal = activeParameters[parNr];
 
 			//convert the parameter uint8_t value to a 3 place char
-			if(parNr==PAR_NONE) {
+			const uint8_t textId = pgm_read_byte(&ap->top1 + i + is2ndPage);
+			if(menu_isCpuMeterText(textId)) {
+				menu_cpuMeterText(textId, valueAsText);
+			} else if(parNr==PAR_NONE) {
 				memcpy(valueAsText,menuText_blank,3);
 			} else { //not if(parNr==PAR_NONE)
 
@@ -2832,6 +2925,15 @@ static void menu_encoderChangeParameter(int8_t inc)
 
 	const uint8_t activeParameter	= menuIndex & MASK_PARAMETER;
 	const uint8_t activePage		= (menuIndex&MASK_PAGE)>>PAGE_SHIFT;
+
+	// CPU meter entries are read-only, turning the encoder on peak or xruns clears both
+	const uint8_t textId = pgm_read_byte(&menuPages[menu_activePage][activePage].top1 + activeParameter);
+	if(menu_isCpuMeterText(textId))
+	{
+		if(textId == TEXT_CPU_PEAK || textId == TEXT_CPU_XRUNS)
+			cpuMeter_resetPeak(&cpuMeter);
+		return;
+	}
 
 	//get address from top1-8 from activeParameter (base adress top1 + offset)
 	uint16_t paramNr		= pgm_read_word(&menuPages[menu_activePage][activePage].bot1 + activeParameter);

@@ -11,7 +11,7 @@ Ideas collected while adding the SysEx protocol ([sysex.md](sysex.md)). None of 
 - [ ] Show a brief "SysEx" indicator when a host writes data.
 
 ## Sound
-- [ ] **Enable the hidden plate reverb.** `Core/Src/Soundengine/FxBus.c` has a `USE_REVERB` path (`Reverb_init`/`Reverb_process`, `FX_REVERB`), and `PAR_FX_REVERB_TYPE` exists in `Parameters.h`. Check CPU and memory headroom first: in the `-sx` build ITCM is at 92% and DTCM at 82%. Then add a menu entry and regenerate `params.json`.
+- [ ] **Enable the hidden plate reverb.** `Core/Src/Soundengine/FxBus.c` has a `USE_REVERB` path (`Reverb_init`/`Reverb_process`, `FX_REVERB`), and `PAR_FX_REVERB_TYPE` exists in `Parameters.h`. Check CPU and memory headroom first with the CPU meter ([performance.md](performance.md)): in the `-sx` build ITCM is at 93% and DTCM at 82%. Then add a menu entry and regenerate `params.json`.
 - [ ] Add per-voice velocity curves.
 
 ## Sequencer
