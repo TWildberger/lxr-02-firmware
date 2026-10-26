@@ -107,6 +107,13 @@
 //---------------------------------------------------------------------
 void parameterArray_init()
 {
+	for(uint8_t i=0; i<NUM_DRUM_VOICES; ++i)
+	{
+		parameterArray[PAR_ENGINE_1+i].ptr = &voiceArray[i].engine;
+		parameterArray[PAR_ENGINE_1+i].type = TYPE_UINT8;
+		parameterArray[PAR_TIMBRE_DECAY_1+i].ptr = &voiceArray[i].feedbackFm.decayControl;
+		parameterArray[PAR_TIMBRE_DECAY_1+i].type = TYPE_FLT;
+	}
 
 	parameterArray[PAR_OSC_WAVE_DRUM1].ptr 	= &voiceArray[0].osc.waveform;
 	parameterArray[PAR_OSC_WAVE_DRUM1].type = TYPE_UINT8;

@@ -71,13 +71,18 @@ The version in the file name, and on the LXR's start-up screen, is set by `proje
 [CMakeLists.txt](CMakeLists.txt). Builds of this fork add the suffix `-sx` (`LXR_FW_SUFFIX`), for the
 SysEx protocol described in [docs/sysex.md](docs/sysex.md).
 
-The SysEx codec, the CPU meter, the plate reverb and the freeze have host-side unit tests that run
+The SysEx codec, CPU meter, plate reverb, freeze and feedback FM have host-side unit tests that run
 on your computer: `make -C tests/host` and `python3 tools/test_lxr_status.py`.
 
 The FX bus has a plate reverb as FX type `rev`. See [docs/reverb.md](docs/reverb.md).
 
 The FX bus has a tempo-synced freeze / beat repeat as FX type `frz`. Hold steps 9–16 in perf mode,
 or send NRPN 210 or SysEx `FX_FREEZE`. See [docs/freeze.md](docs/freeze.md).
+
+Drum voices 1-3 also have an opt-in feedback-FM engine (`eng = fbm` on the
+second oscillator screen). Old kits keep the legacy engine. Controls, example
+sounds, compatibility and the hardware checklist are in
+[docs/feedback-fm.md](docs/feedback-fm.md).
 
 The global menu shows the audio CPU load. It can also be read over SysEx with `tools/lxr_status.py`.
 See [docs/performance.md](docs/performance.md).

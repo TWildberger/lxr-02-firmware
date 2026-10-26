@@ -23,6 +23,7 @@
 #include "menu/menu.h"
 #include "menu/CcNr2Text.h"
 #include "Preset/PresetManager.h"
+#include "Preset/KitEngineFormat.h"
 #include "Soundengine/Sequencer/sequencer.h"
 #include "Soundengine/MIDI/MidiParser.h"
 #include "Soundengine/MIDI/Uart.h"
@@ -52,7 +53,7 @@
 #define RX_BYTES_PER_TICK	1024
 
 #define NAME_LEN			8
-#define KIT_DATA_LEN		(NAME_LEN + END_OF_SOUND_PARAMETERS)
+#define KIT_DATA_LEN		(NAME_LEN + END_OF_SOUND_PARAMETERS + KIT_ENGINE_TAG_SIZE)
 #define NUM_GLOBALS			(NUM_PARAMS - PAR_BEGINNING_OF_GLOBALS)
 #define MAX_PARAMS_PER_MSG	64
 
@@ -448,7 +449,7 @@ static void sx_cmdIdentity(void)
 	sxw_u14(&sx_w, PATTERN_DATA_LEN);
 	sxw_u14(&sx_w, SX_MAX_FRAME);
 	sxw_u14(&sx_w, SX_CAP_KITS | SX_CAP_PATTERNS | SX_CAP_GLOBALS | SX_CAP_PARAMS
-		| SX_CAP_ECHO | SX_CAP_SAVE | SX_CAP_CPU_METER | SX_CAP_FX_FREEZE);
+		| SX_CAP_ECHO | SX_CAP_SAVE | SX_CAP_CPU_METER | SX_CAP_DRUM_ENGINE | SX_CAP_FX_FREEZE);
 	sxw_u7(&sx_w, sx_ownDevByte());
 	sxw_u7(&sx_w, activeParameters[PAR_SYSEX_ECHO] ? 1 : 0);
 	sx_send(sx_replyPorts);
@@ -521,6 +522,7 @@ static void sx_cmdKitRequest(SxReader *r)
 
 	memcpy(sx_scratch, name, NAME_LEN);
 	memcpy(&sx_scratch[NAME_LEN], params, END_OF_SOUND_PARAMETERS);
+	memcpy(&sx_scratch[NAME_LEN + END_OF_SOUND_PARAMETERS], KIT_ENGINE_TAG, KIT_ENGINE_TAG_SIZE);
 
 	sx_begin(SX_CMD_KIT_DUMP);
 	sxw_u7(&sx_w, slot);
@@ -546,10 +548,14 @@ static void sx_cmdKitDump(SxReader *r)
 	const uint8_t *values = &sx_scratch[NAME_LEN];
 	const uint8_t nmt = getNumModTargets();
 	const uint8_t numModIdx = (uint8_t)(sizeof(sx_kitModIdx) / sizeof(sx_kitModIdx[0]));
+	const size_t tagOffset = NAME_LEN + END_OF_SOUND_PARAMETERS;
+	const size_t tagSize = n == END_OF_SOUND_PARAMETERS && rawLen >= (int32_t)tagOffset ?
+		(size_t)rawLen - tagOffset : 0;
 
 	if(slot == 0x7F)
 	{
 		sx_kitApply(activeParameters, END_OF_SOUND_PARAMETERS, values, n, sx_kitModIdx, numModIdx, nmt);
+		kitEngine_migrate(activeParameters, END_OF_SOUND_PARAMETERS, &sx_scratch[tagOffset], tagSize);
 		preset_sendDrumsetParameters();
 		menu_editBufferReplaced();
 		preset_touchTimer(PRESET_KIT_TIMER);
@@ -558,6 +564,7 @@ static void sx_cmdKitDump(SxReader *r)
 	else
 	{
 		sx_kitApply(mainParameters[slot], END_OF_SOUND_PARAMETERS, values, n, sx_kitModIdx, numModIdx, nmt);
+		kitEngine_migrate(mainParameters[slot], END_OF_SOUND_PARAMETERS, &sx_scratch[tagOffset], tagSize);
 		sx_copyName(savefileNames[slot][KIT_NAMES], sx_scratch);
 		if(flags & SX_FLAG_SAVE)
 		{

@@ -194,12 +194,13 @@ Capability bits:
 | 4 | Echo/notifications (`43`–`45`) |
 | 5 | `SAVE` flag (SD card writes) |
 | 6 | CPU meter fields in `STATUS_REPLY` and the `STATUS_REQUEST` flags byte |
-| 7 | Reserved |
+| 7 | Feedback-FM drum engine, reserved-byte migration and `EngV01` kit trailer |
 | 8 | `FX_FREEZE` (`46`) supported |
 
 The capability field is a u14 value encoded as two 7-bit bytes, least
-significant first. This firmware reports `0x017F` (wire bytes `7F 02`):
-bits 0–6 and 8 are set; bit 7 is reserved.
+significant first. This firmware reports `0x01FF` (wire bytes `7F 03`):
+bits 0–8 are set. Freeze-only firmware reports `0x017F` (`7F 02`);
+the FM extension adds bit 7 without changing freeze's bit 8.
 
 Hosts must size their buffers from these numbers rather than hard-coding them.
 `NUM_PARAMS`, `END_OF_SOUND_PARAMETERS` and `PAR_BEGINNING_OF_GLOBALS` must
@@ -281,11 +282,14 @@ Example, request the edit buffer: `F0 7D 4C 7F 01 10 7F 11 F7`
 | slot | u7 |
 | flags | u7 (device → host: always 0) |
 | parameter count *n* | u14 (device → host: 247) |
-| data | packed8 of `name[8]` followed by *n* parameter bytes |
+| data | packed8 of `name[8]`, *n* parameter bytes, then optional `EngV01` (6 ASCII bytes) |
 
 The data is the same layout as an `.snd` file: name, then sound parameters
 0 … *n*−1. See `scope == "sound"` entries in `params.json`. For the edit
 buffer (`7F`) the device reports the name of the current kit slot.
+Devices advertising capability bit 7 append `EngV01` after the 247 parameters,
+so the unpacked body is 261 bytes; *n* is still 247. Preserve this trailer when
+round-tripping a new-engine kit. Older receivers ignore the trailing bytes.
 
 Host → device:
 
@@ -302,11 +306,17 @@ Host → device:
 * Values are stored **byte-exact**, exactly like loading the `.snd` file from
   SD: they are **not** clamped to the front-panel range (factory kits contain
   such values, e.g. hi-hat transient wave 24 or 89, and clamping would change
-  how they sound). The only change is the one the SD loader also
+  how they sound). The changes are the ones the SD loader also
   makes: a velocity or LFO modulation target (`PAR_VEL_DEST_1`–`6`,
   `PAR_TARGET_LFO1`–`6`) that is beyond the device's target table becomes 0.
-  A later `KIT_REQUEST` therefore returns the same bytes that were sent,
-  apart from such targets. (`PARAM_SET` and `GLOBALS_DUMP` still clamp.)
+  With *n* = 247 and the exact 6-byte `EngV01` trailer, ids 221–223 select
+  the engine (0/1) and ids 224–226 hold timbre decay (0–127); invalid values
+  become zero. Without that trailer (including short uploads), these six
+  formerly unused bytes reset to zero, **never enabling a new engine from
+  arbitrary legacy bytes**. A later `KIT_REQUEST` returns the normalized bytes
+  plus the current trailer. (`PARAM_SET` and `GLOBALS_DUMP` still clamp.)
+  `PARAM_SET` can explicitly opt in via ids 221–223 without a container tag;
+  subsequent SD saves and dumps include it automatically.
 * Reply: `ACK(11, slot)`, or `NAK` (`ERR_LENGTH` if the data is shorter than
   `8 + n` bytes, `ERR_RANGE` for a bad slot, `ERR_SD` if saving failed).
 

@@ -34,6 +34,7 @@ enum SxCapability {
 	SX_CAP_ECHO			= 1 << 4,
 	SX_CAP_SAVE			= 1 << 5,
 	SX_CAP_CPU_METER	= 1 << 6,
+	SX_CAP_DRUM_ENGINE	= 1 << 7,
 	SX_CAP_FX_FREEZE	= 1 << 8,
 };
 

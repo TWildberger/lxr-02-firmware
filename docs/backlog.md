@@ -11,6 +11,7 @@ Ideas collected while adding the SysEx protocol ([sysex.md](sysex.md)). Checked 
 - [ ] Show a brief "SysEx" indicator when a host writes data.
 
 ## Sound
+- [x] **One new drum engine: feedback FM.** Opt-in on Drum 1-3; independent timbre decay and modulator feedback. See [feedback-fm.md](feedback-fm.md). Hardware performance/listening checks remain required.
 - [x] **Enable the hidden plate reverb.** Done: FX type `rev`, see [reverb.md](reverb.md).
 - [ ] Reverb: per-voice send levels (today a voice is either routed to the FX bus or not), or a second FX slot so the reverb can run with another FX.
 - [ ] Reverb: when FX type `rev` is selected on the front panel while the reverb type is `off`, switch the type to `Plt` automatically. It must not do this on kit load, where `off` keeps old FX-type-5 kits dry.

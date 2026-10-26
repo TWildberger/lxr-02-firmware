@@ -50,6 +50,8 @@ void initDrumVoice()
 	int i;
 	for(i=0;i<NUM_DRUM_VOICES;i++)
 	{
+		voiceArray[i].engine = DRUM_ENGINE_LEGACY;
+		feedbackFm_init(&voiceArray[i].feedbackFm);
 
 		initOnePole(&voiceArray[i].FaderVolumeFilter);
 		setOnePoleCoef(&voiceArray[i].FaderVolumeFilter,0.01);
@@ -120,6 +122,8 @@ void Drum_updatePan(const uint8_t voiceNr)
 //---------------------------------------------------
 void Drum_trigger(const uint8_t voiceNr, const uint8_t vol, const uint8_t note)
 {
+	if(drumEngine_isFeedback(voiceArray[voiceNr].engine))
+		feedbackFm_trigger(&voiceArray[voiceNr].feedbackFm);
 
 	lfo_retrigger(voiceNr);
 
@@ -228,8 +232,11 @@ IN_ITCM_RAM void calcDrumVoiceAsync(const uint8_t voiceNr)
 #endif
 
 	//update osc phaseInc
-	osc_setFreq(&voiceArray[voiceNr].osc);
-	osc_setFreq(&voiceArray[voiceNr].modOsc);
+	if(!drumEngine_isFeedback(voiceArray[voiceNr].engine))
+	{
+		osc_setFreq(&voiceArray[voiceNr].osc);
+		osc_setFreq(&voiceArray[voiceNr].modOsc);
+	}
 
 
 
@@ -247,6 +254,15 @@ IN_ITCM_RAM void calcDrumVoiceSyncBlock(const uint8_t voiceNr, int16_t* buf, con
 	calcOnePoleBlockFixedInput(&voiceArray[voiceNr].ampFilter, voiceArray[voiceNr].ampFilterInput,voiceArray[voiceNr].volEgValueBlock, size);
 #endif
 
+	if(drumEngine_isFeedback(voiceArray[voiceNr].engine))
+	{
+		DrumVoice *v = &voiceArray[voiceNr];
+		feedbackFm_render(&v->feedbackFm, sine_table, buf, size,
+			v->osc.freq * v->osc.pitchMod * v->osc.modNodeValue,
+			v->modOsc.freq * v->modOsc.modNodeValue, v->fmModAmount, v->pwm);
+	}
+	else
+	{
 	//calc next mod osc sampleBlock - int16_t processing
 	calcNextOscSampleBlock(&voiceArray[voiceNr].modOsc,modBuf,size,voiceArray[voiceNr].fmModAmount, voiceArray[voiceNr].pwm);
 
@@ -260,6 +276,7 @@ IN_ITCM_RAM void calcDrumVoiceSyncBlock(const uint8_t voiceNr, int16_t* buf, con
 	else
 	{
 		calcNextOscSampleFmBlock(&voiceArray[voiceNr].osc,modBuf,buf,size,1.0f, voiceArray[voiceNr].pwm);
+	}
 	}
 
 	//calc transient sample - int16_t processing
@@ -311,5 +328,3 @@ IN_ITCM_RAM void calcDrumVoiceSyncBlock(const uint8_t voiceNr, int16_t* buf, con
 	}
 }
 //---------------------------------------------------
-
-

@@ -2,7 +2,7 @@
 
 The firmware measures how much of the available time the audio render uses.
 This is the headroom left for new engines and effects (for example the
-[plate reverb](reverb.md)). This page describes what is measured, how
+[plate reverb](reverb.md) and [feedback-FM engine](feedback-fm.md)). This page describes what is measured, how
 to read it, and holds the numbers measured on hardware.
 
 ## What is measured

@@ -282,6 +282,8 @@ enum NamesEnum
 	TEXT_CPU_MIXER,
 	TEXT_CPU_FX,
 	TEXT_CPU_XRUNS,
+	TEXT_DRUM_ENGINE,
+	TEXT_TIMBRE_DECAY,
 
 
 	NUM_NAMES
@@ -402,7 +404,9 @@ enum shortNamesEnum
 	SHORT_VOICES,
 	SHORT_MIXER,
 	SHORT_FX,
-	SHORT_XRUNS
+	SHORT_XRUNS,
+	SHORT_ENGINE,
+	SHORT_TIMBRE_DECAY
 	
 };
 //-----------------------------------------------------------------
@@ -542,7 +546,9 @@ enum longNamesEnum
 	LONG_VOICES,
 	LONG_MIXER,
 	LONG_FX,
-	LONG_XRUNS
+	LONG_XRUNS,
+	LONG_ENGINE,
+	LONG_TIMBRE_DECAY
 	
 };
 

@@ -43,6 +43,14 @@
 #define MENU_STEP_FLAM	 	24
 #define MENU_STEP_SHIFT	 	25
 #define MENU_AUDIO_OUT_FX	26
+#define MENU_DRUM_ENGINE		27
+
+const char drumEngineNames[][4] =
+{
+	{2},
+	{"old"},
+	{"fbm"},
+};
 
 //-----------------------------------------------------------------
 // Shared texts. Reduce mem usage by pooling common text
@@ -494,6 +502,8 @@ const char shortNames[][4]  =
 	{"mix"},
 	{"fx"},
 	{"xrn"},
+	{"eng"},
+	{"tmd"},
 
 };
 //-----------------------------------------------------------------
@@ -636,6 +646,8 @@ const char longNames[][16] =
 	{"Mixer"},
 	{"FX"},
 	{"XRuns"},
+	{"Engine"},
+	{"Timbre Decay"},
 };
 
 

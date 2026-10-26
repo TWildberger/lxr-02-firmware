@@ -1326,19 +1326,22 @@ void midiParser_ccHandler(MidiMsg msg, uint8_t updateOriginalValue, uint8_t isFl
 				mixer_audioRouting[msg.data1-CC2_AUDIO_OUT1] = value.itg;
 				break;
 
-				/*
-			case CC2_MIDI_NOTE1:
-			case CC2_MIDI_NOTE2:
-			case CC2_MIDI_NOTE3:
-			case CC2_MIDI_NOTE4:
-			case CC2_MIDI_NOTE5:
-			case CC2_MIDI_NOTE6:
-			case CC2_MIDI_NOTE7:
-				// set the note override for the voice. 0 means use the note value, anything else means
-				// that the note will always play with that note
-				//midi_NoteOverride[msg.data1-CC2_MIDI_NOTE1] = value.itg;
+			case CC2_ENGINE_1:
+			case CC2_ENGINE_2:
+			case CC2_ENGINE_3:
+			{
+				DrumVoice *v = &voiceArray[msg.data1-CC2_ENGINE_1];
+				const uint8_t engine = isFloatModulator ? (value.flt >= .5f) :
+					(value.itg == DRUM_ENGINE_FEEDBACK_FM);
+				if(v->engine != engine) feedbackFm_trigger(&v->feedbackFm);
+				v->engine = engine;
 				break;
-				*/
+			}
+			case CC2_TIMBRE_DECAY_1:
+			case CC2_TIMBRE_DECAY_2:
+			case CC2_TIMBRE_DECAY_3:
+				feedbackFm_setDecay(&voiceArray[msg.data1-CC2_TIMBRE_DECAY_1].feedbackFm, value.flt);
+				break;
 
 			case CC2_MUTE_1:
 			case CC2_MUTE_2:

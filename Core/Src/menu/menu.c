@@ -262,6 +262,8 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_MIXER, CAT_CPU, LONG_MIXER},			/*TEXT_CPU_MIXER*/
 		{SHORT_FX, CAT_CPU, LONG_FX},				/*TEXT_CPU_FX*/
 		{SHORT_XRUNS, CAT_CPU, LONG_XRUNS},			/*TEXT_CPU_XRUNS*/
+		{SHORT_ENGINE, CAT_OSC, LONG_ENGINE},
+		{SHORT_TIMBRE_DECAY, CAT_OSC, LONG_TIMBRE_DECAY},
 
 
 };
@@ -491,12 +493,12 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 	    /*PAR_AUDIO_OUT5*/ 		DTYPE_MENU | (MENU_AUDIO_OUT<<8),
 	    /*PAR_AUDIO_OUT6*/ 		DTYPE_MENU | (MENU_AUDIO_OUT<<8),		//220
 	    // these 7
-	    /*PAR_UNUSED1*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED2*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED3*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED4*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED5*/		DTYPE_NOTE_NAME,
-	    /*PAR_UNUSED6*/		DTYPE_NOTE_NAME,
+	    /*PAR_ENGINE_1*/		DTYPE_MENU | (MENU_DRUM_ENGINE<<8),
+	    /*PAR_ENGINE_2*/		DTYPE_MENU | (MENU_DRUM_ENGINE<<8),
+	    /*PAR_ENGINE_3*/		DTYPE_MENU | (MENU_DRUM_ENGINE<<8),
+	    /*PAR_TIMBRE_DECAY_1*/	DTYPE_0B127,
+	    /*PAR_TIMBRE_DECAY_2*/	DTYPE_0B127,
+	    /*PAR_TIMBRE_DECAY_3*/	DTYPE_0B127,
 	    /*PAR_UNUSED7*/		DTYPE_NOTE_NAME,
 
 		/*PAR_PWM_1,*/			DTYPE_0B127,
@@ -2673,6 +2675,8 @@ static uint8_t getMaxEntriesForMenu(uint8_t menuId)
 
 	case MENU_FX:
 		return fxNames[0][0];
+	case MENU_DRUM_ENGINE:
+		return drumEngineNames[0][0];
 
 	case MENU_DIST:
 		return distNames[0][0];
@@ -2773,6 +2777,9 @@ static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmV
 
 	case MENU_FX:
 		p=fxNames[curParmVal+1];
+		break;
+	case MENU_DRUM_ENGINE:
+		p=drumEngineNames[curParmVal+1];
 		break;
 
 	case MENU_DIST:

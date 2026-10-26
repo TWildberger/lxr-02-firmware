@@ -34,19 +34,32 @@ and restores the autosaved kit and pattern. Saving a project writes
 `prj.nfo`, `glo.cfg` and all 64 kits and patterns into `/projNN`.
 `preset_saveGlobals()` writes `glo.cfg` into the *current* folder.
 
-## `.snd`: kit (255 bytes)
+## `.snd`: kit (261 bytes; legacy 255 bytes)
 
 | Offset | Size | Content |
 |--------|------|---------|
 | 0 | 8 | Kit name |
 | 8 | 247 | Sound parameters 0 … 246 (`END_OF_SOUND_PARAMETERS`), one byte each, in parameter id order |
+| 255 | 6 | Engine extension version tag, ASCII `EngV01` (new saves only) |
 
 * Values are stored exactly as held in memory. Modulation destination
   parameters (`PAR_VEL_DEST_*`, `PAR_TARGET_LFO*`) hold an index into
   `mod_targets` (`params.json`).
 * Shorter files (older firmware with fewer sound parameters) are accepted.
   Missing parameters read as 0.
-* SysEx `KIT_DUMP` carries the same 255 bytes (see [sysex.md](sysex.md)).
+* SysEx `KIT_DUMP` carries the same 261 bytes (see [sysex.md](sysex.md)).
+  The parameter count remains 247; the tag is not a parameter.
+* **Legacy migration:** without the exact `EngV01` tag, ids 221–226 (formerly
+  unused MIDI-note bytes) reset to zero. No legacy waveform, FM-mode or other
+  active sound byte is reinterpreted or range-clamped. With the tag, ids 221–223
+  select the engine for Drum 1–3 (`0` = legacy, `1` = feedback FM); other values
+  become zero. Ids 224–226 are timbre decay (0–127; invalid values become zero).
+  All established parameter and modulation-target IDs stay unchanged.
+  See [feedback-fm.md](feedback-fm.md).
+* Stock firmware ignores the trailer and these six formerly unused bytes, so
+  it plays new kits using the original engine. Saving with stock firmware drops
+  the trailer; reloading that save on this firmware deliberately selects legacy.
+  Back up new-engine kits before editing them on older firmware.
 * FX type (`PAR_FX_TYPE`, offset 242) 5 is the plate reverb, and reverb type
   (`PAR_FX_REVERB_TYPE`, offset 252) is 0 = `off`, 1 = `Plt`, 2 = `Eco`. Older
   kits with FX type 5 have reverb type 0, so they still play the FX bus dry,
@@ -57,7 +70,8 @@ and restores the autosaved kit and pattern. Saving a project writes
   dry.
 
 `tmp.snd` (autosave of the edit buffer) has a different layout: 1 byte kit
-slot number + 247 parameter bytes, and no name. At boot it is loaded after the
+slot number + 247 parameter bytes + the same 6-byte `EngV01` tag (254 bytes),
+and no name. Legacy 248-byte autosaves migrate as above. At boot it is loaded after the
 project, so it decides the edit buffer and the current kit slot.
 
 > Stock v1.7 writes the load/save menu cursor as the slot byte, and at boot

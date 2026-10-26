@@ -75,6 +75,7 @@ add_library(lxr_dsp OBJECT
     Src/Soundengine/DSPAudio/distortion.c
     Src/Soundengine/DSPAudio/dither.c
     Src/Soundengine/DSPAudio/DrumVoice.c
+    Src/Soundengine/DSPAudio/FeedbackFm.c
     Src/Soundengine/DSPAudio/HiHat.c
     Src/Soundengine/DSPAudio/lfo.c
     Src/Soundengine/DSPAudio/mixer.c
