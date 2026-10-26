@@ -120,6 +120,72 @@ measured.
 
 Firmware: `2f179b5` · Image SHA-256: `46b8f317…` · Date: 2026-10-25 · Kit: `TKit1` (slot 16)
 
+### Feedback-FM long-run measurement
+
+Measured on the user's USB-connected LXR-02 on 2026-10-26, running firmware
+`1.7-sx`. `IDENTITY_REPLY` reported capability mask `0x07FF` (including bits
+7–10: `EngV01`, `FX_FREEZE`, conditions and sequencer beat repeat). The active
+kit was slot 16 (`TKit1`), pattern 2; FX was off and the sequencer was stopped.
+All seven voice channels were triggered on 16ths at 120 BPM for five minutes.
+Immediately before the workload, the CPU meter peak and underrun counters were
+reset.
+
+Drum 1–3 feedback-FM was enabled only in the live edit buffer, using the
+documented kick/tom/bell example settings:
+
+| Voice | Engine ID | `tmd` ID/value | FM amount ID/value | FM frequency ID/value | PWM/feedback ID/value |
+|-------|----------:|----------------|--------------------|-----------------------|-----------------------|
+| Drum 1 | 221 / 1 | 224 / 15 | 82 / 35 | 83 / 33 | 228 / 10 |
+| Drum 2 | 222 / 1 | 225 / 45 | 84 / 80 | 85 / 64 | 229 / 40 |
+| Drum 3 | 223 / 1 | 226 / 95 | 86 / 100 | 87 / 76 | 230 / 85 |
+
+| Duration | now % | peak % | voices % | mixer % | fx % | xruns |
+|----------|------:|-------:|---------:|--------:|-----:|------:|
+| 5 minutes | 58.5 | 61.8 | 52.9 | 5.4 | 0.1 | 0 |
+
+The status update immediately afterward reported 57.5% now, 61.8% peak and
+zero xruns. After the run, the original values of all 15 temporarily changed
+parameters were restored with `PARAM_SET` and verified byte-exactly with
+`PARAM_GET`. The active kit remained `TKit1`, FX remained off, and no save or
+SD write was performed.
+
+#### Feedback-FM with plate and Eco reverb
+
+Two further five-minute runs used the same kit, pattern, sequencer state,
+seven-channel 16th-note workload and three FM settings above. All six sound
+voices were routed to FX in the live edit buffer. Reverb used dry/wet 50 and
+P1–P4 = 20/100/64/64; the reverb kind was `Plt` for the plate run and `Eco`
+for the Eco run. Both tests followed a freeze-path test.
+
+| Reverb | Time | now % | peak % | fx % | xruns |
+|--------|-----:|------:|-------:|-----:|------:|
+| `Plt` | 60 s | 70.0 | 72.9 | 11.6 | 0 |
+| `Plt` | 120 s | 70.0 | 72.9 | 11.6 | 0 |
+| `Plt` | 180 s | 70.0 | 72.9 | 11.6 | 0 |
+| `Plt` | 240 s | 70.0 | 73.3 | 11.6 | 0 |
+| `Plt` | 300 s | 70.0 | 73.3 | 11.6 | 0 |
+| `Eco` | 60 s | 65.3 | 68.7 | 6.8 | 0 |
+| `Eco` | 120 s | 65.2 | 68.7 | 6.8 | 0 |
+| `Eco` | 180 s | 65.2 | 68.7 | 6.8 | 0 |
+| `Eco` | 240 s | 65.3 | 68.7 | 6.8 | 0 |
+| `Eco` | 300 s | 65.2 | 68.7 | 6.8 | 0 |
+
+Voices measured 53.1% and mixer 5.3% in both runs. An immediate status after
+switching from `Plt` into `Eco` showed 69.2% now and 11.1% FX during the
+transition; it is excluded above, which reports the steady readings beginning
+at 60 seconds. The original values of all 28 changed/read IDs, including FM
+controls, FX settings and routing, were restored to the edit buffer and
+independently verified with `PARAM_GET`: FX off, all routes direct and all
+three FM engines set to `old`. No save or SD write was performed.
+
+These are measured five-minute operating conditions, not full hardware
+acceptance. No audio was captured or auditioned, and these runs do not cover
+FM extremes, DC/clipping/retrigger/choke/morph or save/reload behavior, freeze
+steady-state performance, modulation/UI/MIDI/SD switching, or sequencer
+condition and beat-repeat behavior. Those checks remain pending in the
+[feedback-FM hardware acceptance checklist](feedback-fm.md#hardware-acceptance-checklist)
+and the checklist below.
+
 ## Sequencer conditions and beat-repeat resources
 
 Same-toolchain release builds of the FM base
@@ -223,10 +289,29 @@ The freeze / beat repeat ([freeze.md](freeze.md)) is counted in **fx**.
 
 ### Measured
 
-To be measured on hardware, with the same setup as the reverb rows above (kit
-`TKit1`, 7 voices on 16ths at 120 BPM, counters reset for each row), FX type
-`frz`, `d/w` 100, P1–P4 = 64/64/127/127 (1/16, original pitch, no decay, no
-gate). "Engaged" rows: hold perf step 13 (1/16) for the whole window.
+The full freeze workload below remains to be measured on hardware, with the
+same setup as the reverb rows above (kit `TKit1`, 7 voices on 16ths at 120 BPM,
+counters reset for each row), FX type `frz`, `d/w` 100, P1–P4 = 64/64/127/127
+(1/16, original pitch, no decay, no gate). "Engaged" rows: hold perf step 13
+(1/16) for the whole window.
+
+#### Exploratory 30-second freeze-path check
+
+On 2026-10-26, the original edit-buffer routing and FX parameters were captured,
+then all six sound voices were temporarily routed to FX (IDs 215–220 = 6).
+FX was set to `frz` (ID 234 = 6), dry/wet 100 (ID 236), and P1–P4 =
+64/64/127/127 (IDs 238–241). `PARAM_GET` verified the setup. After engaging
+1/16 freeze (`FX_FREEZE`, ID 46, value 5), all seven channels were triggered
+on 16ths for 30 seconds; note-offs were sent and freeze was released (value 0).
+
+The subsequent status reported a 64.0% peak and zero xruns. After release,
+`now` was 58.0%, voices 52.0%, mixer 5.4% and FX 0.6%; these are post-release
+values and do not measure steady engaged-freeze cost. No audio was captured or
+auditioned, so this check makes no claims about clicks, timing or audibility.
+The original routing and FX IDs were restored and verified with `PARAM_GET`;
+FX was off, voices were routed directly, and no save was performed. This short
+exploratory check does not replace the longer freeze measurements and broader
+hardware acceptance checks below.
 
 | Setting | now % | peak % | voices % | mixer % | fx % | xruns |
 |---------|------:|-------:|---------:|--------:|-----:|------:|
