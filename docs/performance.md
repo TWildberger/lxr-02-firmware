@@ -23,7 +23,7 @@ cycle counter is read around that call, and the result is accounted in
 | **peak** (`pk`) | Worst single block since boot or the last reset |
 | **voices** (`vce`) | LFOs, modulation, voice parameter updates and the six voice renders |
 | **mixer** (`mix`) | Buffer clears, per-voice decimation, pan and output routing |
-| **fx** (`fx`) | `FxBus_process` (distortion, ring, compressor, delay, reverb), including the one-off buffer clear when the FX type changes |
+| **fx** (`fx`) | `FxBus_process` (distortion, ring, compressor, delay, reverb, freeze), including the one-off buffer clear when the FX type changes |
 | **xruns** (`xrn`) | Underruns: the DAC wanted a new block but the previous one had not been rendered yet. Saturates at 16383 |
 
 Notes:
@@ -170,6 +170,51 @@ the estimate for `Plt` and about 1 point above it for `Eco`.
 Cycles assumed 1.0–1.3 cycles per instruction (Cortex-M7 dual issue; code in
 flash behind the I-cache, delay lines and state in DTCM).
 
+## Freeze
+
+The freeze / beat repeat ([freeze.md](freeze.md)) is counted in **fx**.
+
+### Measured
+
+To be measured on hardware, with the same setup as the reverb rows above (kit
+`TKit1`, 7 voices on 16ths at 120 BPM, counters reset for each row), FX type
+`frz`, `d/w` 100, P1–P4 = 64/64/127/127 (1/16, original pitch, no decay, no
+gate). "Engaged" rows: hold perf step 13 (1/16) for the whole window.
+
+| Setting | now % | peak % | voices % | mixer % | fx % | xruns |
+|---------|------:|-------:|---------:|--------:|-----:|------:|
+| FX `frz`, not engaged | | | | | | |
+| FX `frz`, engaged 1/16, FX output stereo | | | | | | |
+| FX `frz`, engaged 1/32T (most crossfades), stereo | | | | | | |
+| FX `frz`, engaged 1/16, `pit` 127 (tape stop) | | | | | | |
+| FX `frz`, engaged 1/4, FX output mono (single output) | | | | | | |
+
+| Switching test | peak % | xruns |
+|----------------|-------:|------:|
+| Engage/release 1/16 every 150 ms (SysEx `FX_FREEZE`) | | |
+| FX type `frz` ↔ `rev` (type `Plt`), 20 switches 150 ms apart | | |
+
+Firmware: · Image SHA-256: · Date: · Kit:
+
+### Estimate from the code
+
+From the disassembly of the release build (GCC 15.3, `-O3`). Per stereo frame:
+recording ≈10 instructions, clearing/fading the live part ≈5–24, each playing
+repeat (fp16 read, linear interpolation for the pitch, gain ramp) 43 (mono
+output: 29), the dry/wet mix with saturation 43. Code in flash behind the
+I-cache, buffer and state in DTCM, 1.0–1.3 cycles per instruction.
+
+| State | Instructions per frame | Estimated cycles / block | Estimated fx % |
+|-------|------------------------|--------------------------|----------------|
+| Not engaged (passthrough + recording) | ≈35 (mono output: 19) | 2.2–2.9 k | ≈0.7–0.9 |
+| Engaged, one repeat playing | ≈100 | 6.4–8.3 k | ≈2–2.7 |
+| Engaged, 128-frame crossfade (two repeats + live fade) | ≈165 | 10.5–13.7 k | ≈3.4–4.4 in that block, 1–2 blocks per repeat |
+| `pit` above 64 (tape stop) | +14 | +0.9–1.2 k | +0.3–0.4 |
+| Selecting `frz` | no buffer clear | — | — |
+
+At 1/32T and 120 BPM a repeat lasts 1839 frames (29 blocks), so 2 of 29 blocks
+have the crossfade cost and the average stays ≈2.5–3 %.
+
 ## Hardware test checklist
 
 - [ ] Flash `build/release/LXR_V2_V1.7-sx.img` with the bootloader. The unit
@@ -182,7 +227,7 @@ flash behind the I-cache, delay lines and state in DTCM).
       encoder on `pk`/`xrn` clears them. On the other entries it changes
       nothing.
 - [x] `lxr_status.py --port LXR` reports CPU values over USB.
-- [x] `IDENTITY_REPLY` capability bits = `0x7F` (bit 6 set).
+- [x] `IDENTITY_REPLY` capability bits = `0x17F` (bits 0–6 and 8 set).
 - [x] `--reset` clears peak and xruns.
 - [x] `STATUS_REQUEST` reports kit 16 at boot; `KIT_REQUEST` for slot 16
       returns the kit name `TKit1`.

@@ -34,7 +34,7 @@ DTYPE_NAMES = [
 
 VOICE_PAGE_LABELS = ["Drum1", "Drum2", "Drum3", "Snare", "Cymbal", "HiHat closed", "HiHat open"]
 VOICE_SUBPAGES = ["Osc", "AmpEG", "Mod", "FM", "Transient", "Filter", "LFO", "Mix"]
-FX_SUBPAGES = ["Off", "Distortion", "Ring", "Compressor", "Delay", "Reverb"]
+FX_SUBPAGES = ["Off", "Distortion", "Ring", "Compressor", "Delay", "Reverb", "Freeze"]
 
 RESERVED_PREFIXES = ("PAR_UNUSED", "UNUSED_", "PAR_NRPN_", "NRPN_")
 PM63_OFFSET_60 = {
@@ -380,6 +380,9 @@ def build():
                   "CC0 is bank select (kit load), so param 127 is not reachable via CC.",
             "nrpn": "Sound params 128..%d map to NRPN (id-128): CC99=msb, CC98=lsb, CC6=value (7-bit)." % (end_sound - 1),
             "mute_nrpn": "NRPN 1000..1006 mute voice 1..7 (value 0/1).",
+            "freeze_nrpn": "NRPN 210 (CC99=1, CC98=82) engages the freeze FX (PAR_FX_TYPE 6): CC6 value 0 = release, "
+                           "1..8 = 1/4, 1/4T, 1/8, 1/8T, 1/16, 1/16T, 1/32, 1/32T, 9..127 = rate set by PAR_FX_P1. "
+                           "Not a parameter. Same values as SysEx FX_FREEZE (docs/freeze.md).",
             "panel_edits": "Stock firmware does not transmit CC/NRPN for panel edits. Use SysEx parameter "
                            "echo (docs/sysex.md) on firmware that supports it.",
             "mod_target_values": "VEL_DEST_x / TARGET_LFOx / P1_DEST / P2_DEST hold a modTargets index in memory, "

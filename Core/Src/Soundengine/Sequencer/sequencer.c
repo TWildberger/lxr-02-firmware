@@ -1326,6 +1326,9 @@ IN_ITCM_RAM void seq_nextStep()
     midi_process_block = 0;
 	}
 
+	// the freeze FX aligns its slices to this step grid
+	FxBus_seqStep(masterStepPos);
+
 	//---------- now check if the master track is at a full beat position to flash the start/stop button --------
 	if((masterStepPos&3) == 0)
 	{

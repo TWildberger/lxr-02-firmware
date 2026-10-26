@@ -96,6 +96,7 @@ add_library(lxr_dsp OBJECT
     Src/Soundengine/DSPAudio/FX/Distortion.c
     Src/Soundengine/DSPAudio/FX/FxRamBuffer.c
     Src/Soundengine/DSPAudio/FX/Reverb.c
+    Src/Soundengine/DSPAudio/FX/Freeze.c
     Src/Soundengine/DSPAudio/FX/Ringmod.c
 )
 

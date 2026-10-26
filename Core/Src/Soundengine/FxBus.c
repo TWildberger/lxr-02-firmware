@@ -17,6 +17,7 @@
 #include "Soundengine/DSPAudio/BufferTools.h"
 #include "Soundengine/DSPAudio/mixer.h"
 #include "Soundengine/DSPAudio/FX/FxRamBuffer.h"
+#include "Soundengine/Sequencer/sequencer.h"
 INDTCMZ FxBus fxBus;
 
 void FxBus_init()
@@ -39,6 +40,14 @@ void FxBus_init()
 #if USE_REVERB
 	Reverb_init(&fxBus.reverb, FX_BUFFER);
 #endif
+	Freeze_init(&fxBus.freeze, FX_BUFFER, FX_BUFFER_SIZE + 1, REAL_FS);
+}
+
+// Not in ITCM (the freeze code isn't either)
+static __attribute__((noinline)) void FxBus_processFreeze(int16_t *fxBuffer, int16_t *out, uint32_t size, uint8_t channels)
+{
+	Freeze_setTempo(&fxBus.freeze, seq_getBpm(), seq_isRunning());
+	Freeze_process(&fxBus.freeze, fxBuffer, out, size, channels, fxBus.dryWet);
 }
 
 IN_ITCM_RAM void FxBus_process(int16_t *fxBuffer, int16_t* outL,int16_t* outR,int16_t* outL2, int16_t* outR2, uint32_t size)
@@ -135,6 +144,9 @@ IN_ITCM_RAM void FxBus_process(int16_t *fxBuffer, int16_t* outL,int16_t* outR,in
 		Reverb_process(&fxBus.reverb, fxBuffer, out, size, channels, fxBus.dryWet);
 		break;
 #endif
+	case FX_FREEZE:
+		FxBus_processFreeze(fxBuffer, out, size, channels);
+		break;
 
 	}
 
@@ -149,6 +161,7 @@ static uint8_t FxBus_usesFxBuffer(uint8_t type)
 #if USE_REVERB
 	case FX_REVERB:
 #endif
+	case FX_FREEZE:
 		return 1;
 	default:
 		return 0;
@@ -162,8 +175,9 @@ __attribute__((noinline)) void FxBus_handleFxChange()
 
 	if(FxBus_usesFxBuffer(type) && fxBus.bufferOwner != type)
 	{
-		// another FX left its data in the shared buffer: start from silence
-		if(fxBus.bufferOwner != FX_OFF)
+		// another FX left its data in the shared buffer: start from silence.
+		// The freeze never plays what it hasn't recorded: no clear needed.
+		if(fxBus.bufferOwner != FX_OFF && type != FX_FREEZE)
 			FxRamBuffer_clear();
 		fxBus.bufferOwner = type;
 	}
@@ -172,6 +186,9 @@ __attribute__((noinline)) void FxBus_handleFxChange()
 	if(type == FX_REVERB)
 		Reverb_clear(&fxBus.reverb);
 #endif
+	// a new recording starts, an engaged freeze is released
+	if(type == FX_FREEZE)
+		Freeze_reset(&fxBus.freeze);
 	fxBus.lastFxType = type;
 }
 
@@ -226,9 +243,29 @@ void FxBus_updateParameter()
 		Reverb_setEarly(&fxBus.reverb, fxBus.parameter[3]);
 		break;
 #endif
+	case FX_FREEZE:
+		Freeze_setRate(&fxBus.freeze, fxBus.parameter[0]);
+		Freeze_setPitch(&fxBus.freeze, fxBus.parameter[1]);
+		Freeze_setDecay(&fxBus.freeze, fxBus.parameter[2]);
+		Freeze_setGate(&fxBus.freeze, fxBus.parameter[3]);
+		break;
 	default:
 		break;
 	}
+}
+
+uint8_t FxBus_freezeControl(uint8_t value)
+{
+	if(fxBus.fxType != FX_FREEZE)
+		return 0;
+	Freeze_control(&fxBus.freeze, value);
+	return 1;
+}
+
+void FxBus_seqStep(uint8_t stepPos)
+{
+	if(fxBus.fxType == FX_FREEZE)
+		Freeze_step(&fxBus.freeze, stepPos);
 }
 
 void FxBus_setParameter(uint8_t idx, float value)

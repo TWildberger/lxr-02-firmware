@@ -22,6 +22,7 @@
 #include "Soundengine/DSPAudio/FX/Compressor.h"
 #include "Soundengine/DSPAudio/FX/Delay.h"
 #include "Soundengine/DSPAudio/FX/Reverb.h"
+#include "Soundengine/DSPAudio/FX/Freeze.h"
 
 #define USE_REVERB 1
 // Upstream switched the snare/hihat/cymbal filters to a cheaper SVF while the
@@ -38,6 +39,7 @@ enum FxTypeEnum
 #if USE_REVERB
 	FX_REVERB,
 #endif
+	FX_FREEZE = 6,	// stored in kits: keep the number
 	FX_NUM_TYPES
 };
 
@@ -63,6 +65,7 @@ typedef struct FxStruct
 #if USE_REVERB
 	Reverb reverb;
 #endif
+	Freeze freeze;
 
 } FxBus;
 
@@ -77,6 +80,12 @@ void FxBus_prepareFxChange();
 // called from the audio thread when fxType changed since the last block:
 // resets/clears FX state that must not leak between FX types
 void FxBus_handleFxChange();
+// freeze engage/release from panel, MIDI or SysEx (any context). Ignored
+// unless the FX type is FX_FREEZE (returns 0). 0 = release, 1..8 = engage at
+// rate 1/4, 1/4T, 1/8, 1/8T, 1/16, 1/16T, 1/32, 1/32T, 9..127 = engage at P1 rate
+uint8_t FxBus_freezeControl(uint8_t value);
+// sequencer hook: a 16th step starts (stepPos = master step in the pattern)
+void FxBus_seqStep(uint8_t stepPos);
 
 
 #endif /* INC_SOUNDENGINE_FXBUS_H_ */
