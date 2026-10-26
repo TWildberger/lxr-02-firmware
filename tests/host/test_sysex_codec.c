@@ -142,6 +142,30 @@ static void test_writer_doc_examples(void)
 	CHECK_BYTES(buf, n, 0xF0, 0x7D, 0x4C, 0x7F, 0x01, 0x46, 0x00, 0x38, 0xF7);
 }
 //---------------------------------------------------------------------------
+static void test_identity_capabilities(void)
+{
+	CHECK(SX_CAP_KITS == 0x001);
+	CHECK(SX_CAP_PATTERNS == 0x002);
+	CHECK(SX_CAP_GLOBALS == 0x004);
+	CHECK(SX_CAP_PARAMS == 0x008);
+	CHECK(SX_CAP_ECHO == 0x010);
+	CHECK(SX_CAP_SAVE == 0x020);
+	CHECK(SX_CAP_CPU_METER == 0x040);
+	CHECK(SX_CAP_FX_FREEZE == 0x100);
+	const uint16_t capabilities = SX_CAP_KITS | SX_CAP_PATTERNS | SX_CAP_GLOBALS
+		| SX_CAP_PARAMS | SX_CAP_ECHO | SX_CAP_SAVE | SX_CAP_CPU_METER
+		| SX_CAP_FX_FREEZE;
+	CHECK(capabilities == 0x17F);
+
+	uint8_t buf[SX_MAX_FRAME];
+	SxWriter w;
+	sxw_begin(&w, buf, sizeof(buf), 0x7F, SX_CMD_IDENTITY_REPLY);
+	sxw_u14(&w, capabilities);
+	const uint16_t n = sxw_end(&w);
+	CHECK_BYTES(buf, n, 0xF0, 0x7D, 0x4C, 0x7F, 0x01, 0x02,
+		0x7F, 0x02, 0x01, 0xF7);
+}
+//---------------------------------------------------------------------------
 static void test_writer_fields(void)
 {
 	uint8_t buf[SX_MAX_FRAME];
@@ -535,6 +559,7 @@ int main(void)
 	test_unpack_errors();
 	test_checksum();
 	test_writer_doc_examples();
+	test_identity_capabilities();
 	test_writer_fields();
 	test_writer_overflow();
 	test_parse();

@@ -194,6 +194,12 @@ Capability bits:
 | 4 | Echo/notifications (`43`–`45`) |
 | 5 | `SAVE` flag (SD card writes) |
 | 6 | CPU meter fields in `STATUS_REPLY` and the `STATUS_REQUEST` flags byte |
+| 7 | Reserved |
+| 8 | `FX_FREEZE` (`46`) supported |
+
+The capability field is a u14 value encoded as two 7-bit bytes, least
+significant first. This firmware reports `0x017F` (wire bytes `7F 02`):
+bits 0–6 and 8 are set; bit 7 is reserved.
 
 Hosts must size their buffers from these numbers rather than hard-coding them.
 `NUM_PARAMS`, `END_OF_SOUND_PARAMETERS` and `PAR_BEGINNING_OF_GLOBALS` must

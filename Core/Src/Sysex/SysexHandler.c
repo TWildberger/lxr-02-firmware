@@ -65,14 +65,6 @@
 #define ECHO_INTERVAL_MS	20
 #define ECHO_MAX_PAIRS		24
 
-#define CAP_KITS			(1 << 0)
-#define CAP_PATTERNS		(1 << 1)
-#define CAP_GLOBALS			(1 << 2)
-#define CAP_PARAMS			(1 << 3)
-#define CAP_ECHO			(1 << 4)
-#define CAP_SAVE			(1 << 5)
-#define CAP_CPU_METER		(1 << 6)
-
 _Static_assert(sizeof(Step) == 7, "pattern layout changed");
 _Static_assert(sizeof(StepTiming) == 1, "pattern layout changed");
 _Static_assert(PATTERN_DATA_LEN == 3657, "pattern layout changed, update docs/sysex.md");
@@ -455,7 +447,8 @@ static void sx_cmdIdentity(void)
 	sxw_u7(&sx_w, NUM_STEPS);
 	sxw_u14(&sx_w, PATTERN_DATA_LEN);
 	sxw_u14(&sx_w, SX_MAX_FRAME);
-	sxw_u14(&sx_w, CAP_KITS | CAP_PATTERNS | CAP_GLOBALS | CAP_PARAMS | CAP_ECHO | CAP_SAVE | CAP_CPU_METER);
+	sxw_u14(&sx_w, SX_CAP_KITS | SX_CAP_PATTERNS | SX_CAP_GLOBALS | SX_CAP_PARAMS
+		| SX_CAP_ECHO | SX_CAP_SAVE | SX_CAP_CPU_METER | SX_CAP_FX_FREEZE);
 	sxw_u7(&sx_w, sx_ownDevByte());
 	sxw_u7(&sx_w, activeParameters[PAR_SYSEX_ECHO] ? 1 : 0);
 	sx_send(sx_replyPorts);

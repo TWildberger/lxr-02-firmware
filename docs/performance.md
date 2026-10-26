@@ -227,7 +227,7 @@ have the crossfade cost and the average stays ≈2.5–3 %.
       encoder on `pk`/`xrn` clears them. On the other entries it changes
       nothing.
 - [x] `lxr_status.py --port LXR` reports CPU values over USB.
-- [x] `IDENTITY_REPLY` capability bits = `0x7F` (bit 6 set).
+- [x] `IDENTITY_REPLY` capability bits = `0x17F` (bits 0–6 and 8 set).
 - [x] `--reset` clears peak and xruns.
 - [x] `STATUS_REQUEST` reports kit 16 at boot; `KIT_REQUEST` for slot 16
       returns the kit name `TKit1`.

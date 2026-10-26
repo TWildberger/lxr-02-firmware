@@ -26,6 +26,17 @@
 
 #define SX_FLAG_SAVE			0x01
 
+enum SxCapability {
+	SX_CAP_KITS			= 1 << 0,
+	SX_CAP_PATTERNS		= 1 << 1,
+	SX_CAP_GLOBALS		= 1 << 2,
+	SX_CAP_PARAMS		= 1 << 3,
+	SX_CAP_ECHO			= 1 << 4,
+	SX_CAP_SAVE			= 1 << 5,
+	SX_CAP_CPU_METER	= 1 << 6,
+	SX_CAP_FX_FREEZE	= 1 << 8,
+};
+
 enum SxCommand {
 	SX_CMD_IDENTITY_REQ		= 0x01,
 	SX_CMD_IDENTITY_REPLY	= 0x02,
