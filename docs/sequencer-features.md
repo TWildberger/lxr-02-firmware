@@ -24,9 +24,10 @@ half note). In performance mode, hold the eighth performance pad (the
 otherwise unused eighth roll pad) to repeat the current segment; release it
 to resume at the position the sequencer would naturally have reached. The
 repeat holds the condition-cycle context for the loop, while the hidden natural
-position and cycle counters continue advancing. Stopping the sequencer or
-switching patterns also releases the repeat. This loops sequencer steps and is
-independent of the audio freeze effect.
+position and cycle counters continue advancing. Stopping or resetting the
+sequencer releases the repeat. Pending pattern/song changes wait until repeat
+is released and a normal pattern boundary is reached. This loops sequencer
+steps and is independent of the audio freeze effect.
 
 The existing song mode already stores and edits a 64-entry pattern chain.
 Additional per-track ratchet controls, more than two parameter locks per step,
