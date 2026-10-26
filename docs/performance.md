@@ -98,22 +98,26 @@ For headroom planning, use *now* for the steady load and *peak* for the margin.
 
 ## Hardware numbers
 
-Measured on the LXR-02 with the release build (`LXR_V2_V1.7-sx.img`).
-Use 120 BPM unless noted. "All 6 voices" means a pattern with every drum track
-triggering on every 16th step, using the default kit unless noted.
+Measured on the user's LXR-02 over USB with the release image
+(`LXR_V2_V1.7-sx.img`, SHA-256 `46b8f317…`), kit slot 16 (`TKit1`), on
+2026-10-25. Values are after `--reset` and are percentages of block time.
 
 | Scenario | now % | peak % | voices % | mixer % | fx % | xruns |
 |----------|------:|-------:|---------:|--------:|-----:|------:|
-| Idle, sequencer stopped, FX off | | | | | | |
-| All 6 voices, FX off | | | | | | |
-| All 6 voices, FX distortion | | | | | | |
-| All 6 voices, FX ring | | | | | | |
-| All 6 voices, FX compressor | | | | | | |
-| All 6 voices, FX delay | | | | | | |
-| All 6 voices, FX delay, 300 BPM | | | | | | |
-| All 6 voices, FX delay, saving the project to SD | | | | | | |
+| Idle, sequencer stopped | 56.9 | 57.4 | 51.6 | 5.1 | 0.2 | 0 |
+| 7 voices retriggered on 16ths at 120 BPM | 57.9 | 59.7 | 52.6 | 5.1 | 0.2 | 0 |
+| 7 voices retriggered every 20 ms | 58.7 | 59.7 | 53.4 | 5.1 | 0.2 | 0 |
+| 7 voices retriggered every 5 ms | 58.8 | 59.9 | 53.4 | 5.2 | 0.2 | 0 |
 
-Firmware: ______ (commit) · Date: ______ · Kit: ______
+The boot-time peak was 65.9% with 78 xruns before reset; this likely includes
+boot/kit-load work such as SD access, so it is not a steady-state measurement.
+The tested kit does not use FX. Voices render continuously even when not being
+triggered, so the load stays nearly flat at about 57–60%, leaving about 40%
+headroom. Sequencer playback was not measured because MIDI Start is ignored
+with the current sync settings. FX-specific, 300 BPM and SD-save loads remain
+to be measured.
+
+Firmware: `2f179b5` · Image SHA-256: `46b8f317…` · Date: 2026-10-25 · Kit: `TKit1` (slot 16)
 
 ## Hardware test checklist
 
@@ -126,10 +130,17 @@ Firmware: ______ (commit) · Date: ______ · Kit: ______
 - [ ] Encoder click shows `CPU` + full name and the value with `%`. Turning the
       encoder on `pk`/`xrn` clears them. On the other entries it changes
       nothing.
-- [ ] `lxr_status.py --port LXR` returns the same values as the LCD (within
-      one refresh). This works over USB and DIN.
-- [ ] `IDENTITY_REPLY` capability bits = `0x7F` (bit 6 set).
-- [ ] `--reset` clears peak and xruns.
+- [x] `lxr_status.py --port LXR` reports CPU values over USB.
+- [x] `IDENTITY_REPLY` capability bits = `0x7F` (bit 6 set).
+- [x] `--reset` clears peak and xruns.
+- [x] `STATUS_REQUEST` reports kit 16 at boot; `KIT_REQUEST` for slot 16
+      returns the kit name `TKit1`.
+- [x] `KIT_DUMP` round trip is byte-exact; `GLOBALS` returns 33 values and
+      `PARAM_GET` works.
+- [ ] Verify `lxr_status.py` values match the LCD. The LCD page has not been
+      tested yet.
+- [ ] Test the LCD page and encoder resets.
+- [ ] Power-cycle after changing the kit from the panel.
 - [ ] xruns stay at 0 during normal playback. Note whether they rise during
       SD saves, kit loads or heavy MIDI input.
 - [ ] Fill in the hardware numbers table above.
