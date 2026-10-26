@@ -4286,6 +4286,7 @@ void menu_loadKit(uint8_t kitNr)
 	menu_editBufferReplaced();
 
 	menu_loadedPresetNr[CURRENT_KIT] = kitNr;
+	menu_selectedPresetNr[SAVE_TYPE_KIT] = kitNr;
 	//update autosave kit
 	preset_touchTimer(PRESET_KIT_TIMER);
 	//store selected kit in current pattern

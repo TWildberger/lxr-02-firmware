@@ -214,7 +214,7 @@ Request has no payload. Reply:
 
 | Field | Encoding |
 |-------|----------|
-| current kit slot (last kit loaded or saved) | u7 |
+| current kit slot (last kit loaded or saved; after boot, the slot stored in `/tmp/tmp.snd`) | u7 |
 | active pattern | u7 |
 | sequencer running | u7 (0/1) |
 | parameter echo on | u7 (0/1) |

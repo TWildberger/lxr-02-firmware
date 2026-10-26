@@ -49,7 +49,14 @@ and restores the autosaved kit and pattern. Saving a project writes
 * SysEx `KIT_DUMP` carries the same 255 bytes (see [sysex.md](sysex.md)).
 
 `tmp.snd` (autosave of the edit buffer) has a different layout: 1 byte kit
-slot number + 247 parameter bytes, and no name.
+slot number + 247 parameter bytes, and no name. At boot it is loaded after the
+project, so it decides the edit buffer and the current kit slot.
+
+> Stock v1.7 writes the load/save menu cursor as the slot byte, and at boot
+> restores only that cursor, not the "current kit" number (which stays at the
+> project's value, usually 0). This firmware writes the slot of the kit that is
+> actually in the edit buffer, and restores it as the current kit. Files are
+> compatible both ways.
 
 ## `.pat`: pattern (3663 bytes)
 

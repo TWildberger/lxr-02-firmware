@@ -214,8 +214,8 @@ FRESULT preset_saveTmpKit()
 		return res;
 	}
 
-	//write current preset nr to file
-	res = f_write((FIL*)&SDFile,(void*)&menu_selectedPresetNr[SAVE_TYPE_KIT],1,&bytesWritten);
+	//write current preset nr to file (the kit in the edit buffer, not the load/save menu cursor)
+	res = f_write((FIL*)&SDFile,(void*)&menu_loadedPresetNr[CURRENT_KIT],1,&bytesWritten);
 	if(res != FR_OK)
 	{
 		f_close((FIL*)&SDFile);
@@ -292,6 +292,9 @@ FRESULT preset_LoadTmpKit()
 
 		// update the soundengine with the new parameters
 		if(res==FR_OK) {
+			// the edit buffer now holds this kit
+			if(kitNr < NUM_KIT_SLOTS)
+				menu_loadedPresetNr[CURRENT_KIT] = kitNr;
 			preset_sendDrumsetParameters();
 			return FR_OK;
 		}

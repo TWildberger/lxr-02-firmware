@@ -568,6 +568,7 @@ static void sx_cmdKitStore(SxReader *r)
 	if(slot != current)
 		memcpy(savefileNames[slot][KIT_NAMES], savefileNames[current][KIT_NAMES], NAME_LEN);
 	menu_loadedPresetNr[CURRENT_KIT] = slot;
+	menu_selectedPresetNr[SAVE_TYPE_KIT] = slot;
 	sx_syncShadow();
 
 	if(flags & SX_FLAG_SAVE)
