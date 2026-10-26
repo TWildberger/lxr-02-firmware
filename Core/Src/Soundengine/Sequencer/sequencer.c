@@ -40,6 +40,10 @@
 
 void seq_setPendingPatternActive();
 
+_Static_assert(SEQ_CONDITION_BYTES * 8 == NUM_TRACKS * NUM_STEPS * 3,
+		"packed condition storage must cover every step");
+_Static_assert(SEQ_CONDITION_TRACK_BYTES * 8 == NUM_STEPS * 3,
+		"packed condition track size changed");
 
 
 #define SEQ_PRESCALER_MASK 	0x03
@@ -107,6 +111,13 @@ struct
 //uint8_t seq_barCounter;						/**< counts the absolute position in bars since the seq was started */
 
 static uint8_t seq_loadPendigFlag = 0;
+static uint16_t seq_trackCycles[NUM_TRACKS];
+static uint8_t seq_repeatActive;
+static uint8_t seq_repeatSteps;
+static uint8_t seq_repeatPhase;
+static uint8_t seq_repeatStart[NUM_TRACKS];
+static int8_t seq_repeatResume[NUM_TRACKS];
+static uint16_t seq_repeatCycle[NUM_TRACKS];
 
 // Allow it to be configured whether it keeps track of bar position in the song for
 // the purpose of pattern changes
@@ -231,7 +242,8 @@ void seq_copyPatternToBackupBuffer(uint8_t patternNr)
 		memcpy(&patternBackupBuffer.seq_mainSteps[i], &seq_patternSet.seq_mainSteps[i][patternNr],  sizeof(uint16_t)*NUM_TRACKS);
 	}
 	memcpy(&patternBackupBuffer.length, &seq_patternSet.length[patternNr],  sizeof(uint8_t)*NUM_TRACKS);
-
+	memcpy(patternBackupBuffer.seq_conditions, seq_patternSet.seq_conditions[patternNr],
+			SEQ_CONDITION_BYTES);
 
 
 	patternBackupBuffer.shuffle = seq_patternSet.shuffle[patternNr];;
@@ -248,6 +260,8 @@ void seq_copyBackupBufferToPattern(uint8_t patternNr)
 		memcpy(&seq_patternSet.seq_mainSteps[i][patternNr], &patternBackupBuffer.seq_mainSteps[i],  sizeof(uint16_t)*NUM_TRACKS);
 	}
 	memcpy(&seq_patternSet.length[patternNr], &patternBackupBuffer.length,  sizeof(uint8_t)*NUM_TRACKS);
+	memcpy(seq_patternSet.seq_conditions[patternNr], patternBackupBuffer.seq_conditions,
+			SEQ_CONDITION_BYTES);
 
 	seq_patternSet.shuffle[patternNr] = patternBackupBuffer.shuffle;
 	seq_patternSet.kitNr[patternNr] = patternBackupBuffer.kitNr;
@@ -1000,19 +1014,39 @@ uint32_t seq_getShiftFlamPattern(const uint8_t track, uint8_t step, StepPosition
 		switch(stepPos)
 		{
 		case STEP_PREV:
-			if( (seq_rndValue[track].prev) > seq_patternSet.seq_subStepPattern[seq_activePattern][track][step].prob ) currentStepActive = 0;
+			if(!seq_probability_allows(
+					seq_patternSet.seq_subStepPattern[seq_activePattern][track][step].prob,
+					seq_rndValue[track].prev)) currentStepActive = 0;
 			break;
 
 		default:
 		case STEP_CURRENT:
-			if( (seq_rndValue[track].current) > seq_patternSet.seq_subStepPattern[seq_activePattern][track][step].prob ) currentStepActive = 0;
+			if(!seq_probability_allows(
+					seq_patternSet.seq_subStepPattern[seq_activePattern][track][step].prob,
+					seq_rndValue[track].current)) currentStepActive = 0;
 			break;
 
 		case STEP_NEXT:
-			if( (seq_rndValue[track].next) > seq_patternSet.seq_subStepPattern[seq_activePattern][track][step].prob ) currentStepActive = 0;
+			if(!seq_probability_allows(
+					seq_patternSet.seq_subStepPattern[seq_activePattern][track][step].prob,
+					seq_rndValue[track].next)) currentStepActive = 0;
 			break;
 		}
-		if(!currentStepActive) return 0;
+		uint16_t conditionCycle = seq_repeatActive
+				? seq_repeatCycle[track] : seq_trackCycles[track];
+		if(stepPos == STEP_NEXT && !seq_repeatActive && seq_stepIndex[track] >= 0
+				&& step < (uint8_t)seq_stepIndex[track]
+				&& conditionCycle < UINT16_MAX)
+			conditionCycle++;
+		else if(stepPos == STEP_PREV && !seq_repeatActive && seq_stepIndex[track] >= 0
+				&& step > (uint8_t)seq_stepIndex[track]
+				&& conditionCycle > 0)
+			conditionCycle--;
+
+		if(!currentStepActive
+				|| !seq_condition_allows(seq_getStepCondition(seq_activePattern, track, step),
+						conditionCycle))
+			return 0;
 
 		//add step pattern for active steps
 		stepPattern = flamIdxToPattern(flamCurrentStep);
@@ -1261,6 +1295,17 @@ IN_ITCM_RAM void seq_nextStep()
 
 	seq_masterStepCnt++;
 
+	if(seq_repeatActive)
+	{
+		for(uint8_t i = 0; i < NUM_TRACKS; i++)
+		{
+			uint8_t length = seq_patternSet.length[seq_activePattern][i];
+			if(length == 0) length = 16;
+			seq_stepIndex[i] = (int8_t)((seq_repeatStart[i] + seq_repeatPhase
+					+ length - 1u) % length);
+		}
+	}
+
 	//---- calc master step position. max value is 64. also take in regard the pattern length -----
 	// track 0 determines the master step position
 	uint8_t masterStepPos;
@@ -1286,7 +1331,7 @@ IN_ITCM_RAM void seq_nextStep()
 	}
 
 	//-------- check if the master track has ended and check if a pattern switch is necessary --------
-	if(masterStepPos == 0)
+	if(masterStepPos == 0 && !seq_repeatActive)
 	{
 		if(seq_activePattern == seq_pendingPattern)
 		{
@@ -1353,6 +1398,7 @@ IN_ITCM_RAM void seq_nextStep()
 	for(i=0;i<NUM_TRACKS;i++)
 	{
 		//increment the step index
+		const int8_t previousStep = seq_stepIndex[i];
 		seq_stepIndex[i]++;
 		//check if track end is reached
 
@@ -1364,6 +1410,9 @@ IN_ITCM_RAM void seq_nextStep()
 		if((seq_stepIndex[i]) >= seqlen || (seq_stepIndex[i] & 0x3f) == 0)
 		{
 			//if end is reached reset track to step 0
+			if(previousStep >= 0 && !seq_repeatActive
+					&& seq_trackCycles[i] < UINT16_MAX)
+				seq_trackCycles[i]++;
 			seq_stepIndex[i] = 0;
 		}
 
@@ -1461,6 +1510,24 @@ IN_ITCM_RAM void seq_nextStep()
 	}//end oneshot
 
 }
+	if(seq_repeatActive)
+	{
+		for(uint8_t track = 0; track < NUM_TRACKS; track++)
+		{
+			uint8_t length = seq_patternSet.length[seq_activePattern][track];
+			if(length == 0) length = 16;
+			seq_repeatResume[track]++;
+			if(seq_repeatResume[track] >= length)
+			{
+				seq_repeatResume[track] = 0;
+				if(seq_trackCycles[track] < UINT16_MAX)
+					seq_trackCycles[track]++;
+			}
+		}
+		seq_repeatPhase++;
+		if(seq_repeatPhase >= seq_repeatSteps)
+			seq_repeatPhase = 0;
+	}
 	//TODO can maybe be combined with pattern change follow above?!
 	//step display follows bars
 	if(activeParameters[PAR_FOLLOW] & FOLLOW_BAR ) {
@@ -1990,6 +2057,60 @@ void seq_setSongModeEnabled(uint8_t onOff)
 	{
 		seq_songPositionPointer = -1; //because nextStep() will first increase it
 	}
+}
+//------------------------------------------------------------------------------
+void seq_setBeatRepeat(uint8_t rate, uint8_t active)
+{
+	if(!active)
+	{
+		if(seq_repeatActive)
+		{
+			seq_repeatActive = 0;
+			for(uint8_t track = 0; track < NUM_TRACKS; track++)
+				seq_stepIndex[track] = seq_repeatResume[track];
+		}
+		return;
+	}
+
+	if(rate > 3) rate = 3;
+	if(seq_repeatActive)
+		seq_setBeatRepeat(0, 0);
+
+	seq_repeatSteps = (uint8_t)(1u << rate);
+	seq_repeatPhase = 0;
+	for(uint8_t track = 0; track < NUM_TRACKS; track++)
+	{
+		uint8_t length = seq_patternSet.length[seq_activePattern][track];
+		if(length == 0) length = 16;
+		int16_t current = seq_stepIndex[track];
+		seq_repeatResume[track] = seq_stepIndex[track];
+		seq_repeatCycle[track] = seq_trackCycles[track];
+		if(current < 0)
+			current = seq_repeatSteps - 1u;
+		seq_repeatStart[track] = (uint8_t)((current + length
+				- ((seq_repeatSteps - 1u) % length)) % length);
+	}
+	seq_repeatActive = 1;
+}
+//------------------------------------------------------------------------------
+uint8_t seq_getStepCondition(uint8_t pattern, uint8_t track, uint8_t step)
+{
+	if(pattern >= NUM_PATTERN || track >= NUM_TRACKS || step >= NUM_STEPS)
+		return SEQ_CONDITION_ALWAYS;
+	return seq_condition_get(seq_patternSet.seq_conditions[pattern],
+			(uint16_t)(track * NUM_STEPS + step));
+}
+//------------------------------------------------------------------------------
+void seq_setStepCondition(uint8_t pattern, uint8_t track, uint8_t step, uint8_t condition)
+{
+	if(pattern >= NUM_PATTERN || track >= NUM_TRACKS || step >= NUM_STEPS)
+		return;
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	seq_condition_set(seq_patternSet.seq_conditions[pattern],
+			(uint16_t)(track * NUM_STEPS + step), condition);
+	if(!primask)
+		__enable_irq();
 }
 //------------------------------------------------------------------------------
 void seq_addPatternToSong(uint8_t patternNr)
@@ -2551,6 +2672,8 @@ void seq_clearTrack(uint8_t trackNr, uint8_t pattern)
 		if( (k%8) == 0)
 			seq_patternSet.seq_subStepPattern[pattern][trackNr][k].volume |= STEP_ACTIVE_MASK ;
 	}
+	memset(&seq_patternSet.seq_conditions[pattern]
+			[trackNr * SEQ_CONDITION_TRACK_BYTES], 0, SEQ_CONDITION_TRACK_BYTES);
 
 	// all main steps off for this track
 	for(uint8_t i=0;i<NUM_BARS;i++)	seq_patternSet.seq_mainSteps[i][pattern][trackNr] = 0;
@@ -2614,6 +2737,9 @@ void seq_copyTrack(uint8_t srcNr, uint8_t dstNr, uint8_t pattern)
 
 	// copy length and rotation offset from source track
 	seq_patternSet.length[pattern][dstNr] = seq_patternSet.length[pattern][srcNr];
+	memcpy(&seq_patternSet.seq_conditions[pattern][dstNr * SEQ_CONDITION_TRACK_BYTES],
+			&seq_patternSet.seq_conditions[pattern][srcNr * SEQ_CONDITION_TRACK_BYTES],
+			SEQ_CONDITION_TRACK_BYTES);
 
 
 }
@@ -2650,6 +2776,8 @@ void seq_copyPattern(uint8_t src, uint8_t dst)
 		seq_patternSet.shuffle[dst] = seq_patternSet.shuffle[src];
 		seq_patternSet.kitNr[dst] = seq_patternSet.kitNr[src];
 	}
+	memcpy(seq_patternSet.seq_conditions[dst], seq_patternSet.seq_conditions[src],
+			SEQ_CONDITION_BYTES);
 }
 //------------------------------------------------------------------------------
 void seq_setActiveAutomationTrack(uint8_t trackNr)
@@ -2776,6 +2904,8 @@ static void seq_sendProgChg(const uint8_t ptn)
 
 static void seq_setStepIndexToStart()
 {
+	seq_setBeatRepeat(0, 0);
+	memset(seq_trackCycles, 0, sizeof(seq_trackCycles));
 	/*
 	uint8_t len, rot, i;
 	for(i=0;i<NUM_TRACKS;i++) {
@@ -2804,4 +2934,3 @@ static void seq_setStepIndexToStart()
 	}
 
 }
-

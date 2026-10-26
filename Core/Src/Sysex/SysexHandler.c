@@ -449,7 +449,8 @@ static void sx_cmdIdentity(void)
 	sxw_u14(&sx_w, PATTERN_DATA_LEN);
 	sxw_u14(&sx_w, SX_MAX_FRAME);
 	sxw_u14(&sx_w, SX_CAP_KITS | SX_CAP_PATTERNS | SX_CAP_GLOBALS | SX_CAP_PARAMS
-		| SX_CAP_ECHO | SX_CAP_SAVE | SX_CAP_CPU_METER | SX_CAP_DRUM_ENGINE | SX_CAP_FX_FREEZE);
+		| SX_CAP_ECHO | SX_CAP_SAVE | SX_CAP_CPU_METER | SX_CAP_DRUM_ENGINE
+		| SX_CAP_FX_FREEZE | SX_CAP_SEQ_CONDITIONS | SX_CAP_BEAT_REPEAT);
 	sxw_u7(&sx_w, sx_ownDevByte());
 	sxw_u7(&sx_w, activeParameters[PAR_SYSEX_ECHO] ? 1 : 0);
 	sx_send(sx_replyPorts);
@@ -747,6 +748,69 @@ static void sx_cmdPatternChunk(SxReader *r)
 	sx_ack(SX_CMD_PATTERN_CHUNK, idx);
 }
 //---------------------------------------------------------------------------
+static uint8_t sx_conditionSlot(SxReader *r, uint8_t cmd)
+{
+	uint8_t slot = sxr_u7(r);
+	if(r->err) { sx_nak(cmd, SX_ERR_LENGTH, 0); return 0xFF; }
+	if(slot == 0x7F) slot = seq_activePattern;
+	if(slot >= NUM_PATTERN) { sx_nak(cmd, SX_ERR_RANGE, slot); return 0xFF; }
+	return slot;
+}
+//---------------------------------------------------------------------------
+static void sx_cmdConditionRequest(SxReader *r)
+{
+	const uint8_t slot = sx_conditionSlot(r, SX_CMD_CONDITION_REQ);
+	if(slot == 0xFF) return;
+	sx_begin(SX_CMD_CONDITION_DUMP);
+	sxw_u7(&sx_w, slot);
+	sxw_packed(&sx_w, seq_patternSet.seq_conditions[slot], SEQ_CONDITION_BYTES);
+	sx_send(sx_replyPorts);
+}
+//---------------------------------------------------------------------------
+static void sx_cmdConditionSet(SxReader *r)
+{
+	const uint8_t slot = sx_conditionSlot(r, SX_CMD_CONDITION_SET);
+	if(slot == 0xFF) return;
+	const uint8_t flags = sxr_u7(r);
+	if(r->err) { sx_nak(SX_CMD_CONDITION_SET, SX_ERR_LENGTH, 0); return; }
+	if(flags & (uint8_t)~SX_FLAG_SAVE)
+	{
+		sx_nak(SX_CMD_CONDITION_SET, SX_ERR_RANGE, flags);
+		return;
+	}
+	const int32_t rawLen = sx_unpack(sxr_ptr(r), sxr_remaining(r), sx_scratch,
+			SEQ_CONDITION_BYTES);
+	if(rawLen != SEQ_CONDITION_BYTES)
+	{
+		sx_nak(SX_CMD_CONDITION_SET, SX_ERR_LENGTH, slot);
+		return;
+	}
+	const uint32_t primask = sx_irqSave();
+	memcpy(seq_patternSet.seq_conditions[slot], sx_scratch, SEQ_CONDITION_BYTES);
+	sx_irqRestore(primask);
+	if(slot == seq_activePattern)
+		seq_copyPatternToBackupBuffer(slot);
+	if(flags & SX_FLAG_SAVE)
+	{
+		const FRESULT res = preset_savePatternSD(slot);
+		if(res != FR_OK) { sx_nak(SX_CMD_CONDITION_SET, SX_ERR_SD, res); return; }
+	}
+	sx_ack(SX_CMD_CONDITION_SET, slot);
+}
+//---------------------------------------------------------------------------
+static void sx_cmdBeatRepeat(SxReader *r)
+{
+	const uint8_t active = sxr_u7(r);
+	const uint8_t rate = sxr_u7(r);
+	if(r->err) { sx_nak(SX_CMD_SEQ_BEAT_REPEAT, SX_ERR_LENGTH, 0); return; }
+	if(active > 1 || rate > 3)
+	{
+		sx_nak(SX_CMD_SEQ_BEAT_REPEAT, SX_ERR_RANGE, active > 1 ? active : rate);
+		return;
+	}
+	seq_setBeatRepeat(rate, active);
+}
+//---------------------------------------------------------------------------
 static void sx_cmdGlobalsRequest(void)
 {
 	sx_begin(SX_CMD_GLOBALS_DUMP);
@@ -865,12 +929,15 @@ static void sx_dispatch(const SxFrame *f)
 	case SX_CMD_PATTERN_REQ:	sx_cmdPatternRequest(&r); break;
 	case SX_CMD_PATTERN_CHUNK:	sx_cmdPatternChunk(&r); break;
 	case SX_CMD_PATTERN_NAME:	sx_cmdName(SX_CMD_PATTERN_NAME, &r); break;
+	case SX_CMD_CONDITION_REQ:	sx_cmdConditionRequest(&r); break;
+	case SX_CMD_CONDITION_SET:	sx_cmdConditionSet(&r); break;
 	case SX_CMD_GLOBALS_REQ:	sx_cmdGlobalsRequest(); break;
 	case SX_CMD_GLOBALS_DUMP:	sx_cmdGlobalsDump(&r); break;
 	case SX_CMD_PARAM_GET:		sx_cmdParamGet(&r); break;
 	case SX_CMD_PARAM_SET:		sx_cmdParamSet(&r); break;
 	case SX_CMD_ECHO_SET:		sx_cmdEchoSet(&r); break;
 	case SX_CMD_FX_FREEZE:		sx_cmdFxFreeze(&r); break;
+	case SX_CMD_SEQ_BEAT_REPEAT: sx_cmdBeatRepeat(&r); break;
 	default:					sx_nak(f->cmd, SX_ERR_UNKNOWN_CMD, 0); break;
 	}
 }

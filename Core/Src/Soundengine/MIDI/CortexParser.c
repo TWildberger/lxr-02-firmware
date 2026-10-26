@@ -755,6 +755,14 @@ static void frontParser_handleSeqCC()
 		seq_patternSet.seq_subStepPattern[frontParser_shownPattern][frontParser_activeTrack][frontParser_activeStep].prob = (cortex_midiMsg.data2);
 		break;
 
+	case FRONT_SEQ_STEP_CONDITION:
+		if(frontParser_shownPattern < NUM_PATTERN
+				&& frontParser_activeTrack < NUM_TRACKS
+				&& frontParser_activeStep < NUM_STEPS)
+			seq_setStepCondition(frontParser_shownPattern, frontParser_activeTrack,
+					frontParser_activeStep, cortex_midiMsg.data2);
+		break;
+
 	case FRONT_SEQ_EUKLID_LENGTH:
 		{
 			uint8_t length 	= cortex_midiMsg.data2 >> 3;
@@ -945,6 +953,10 @@ static void frontParser_handleSeqCC()
 		uart_sendFrontpanelByte(FRONT_SEQ_SHIFT);
 		uart_sendFrontpanelByte(seq_patternSet.seq_stepTiming[frontParser_shownPattern][frontParser_activeTrack][cortex_midiMsg.data2].shift);
 
+		uart_sendFrontpanelByte(FRONT_SEQ_CC);
+		uart_sendFrontpanelByte(FRONT_SEQ_STEP_CONDITION);
+		uart_sendFrontpanelByte(seq_getStepCondition(frontParser_shownPattern,
+				frontParser_activeTrack, data2));
 
 
 		//send back automation params
@@ -998,6 +1010,13 @@ static void frontParser_handleSeqCC()
 
 	case FRONT_SEQ_ROLL_RATE:
 		seq_setRollRate(cortex_midiMsg.data2);
+		break;
+
+	case FRONT_SEQ_BEAT_REPEAT:
+		if(cortex_midiMsg.data2 == 0)
+			seq_setBeatRepeat(0, 0);
+		else
+			seq_setBeatRepeat((uint8_t)(cortex_midiMsg.data2 - 1u), 1);
 		break;
 
 	case FRONT_SEQ_ROLL_ON_OFF:

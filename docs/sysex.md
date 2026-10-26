@@ -122,6 +122,9 @@ Receive rules (device side; hosts should apply the same):
 | `20` | `PATTERN_REQUEST` | host → device | `PATTERN_CHUNK` × n |
 | `21` | `PATTERN_CHUNK` | both | to device: `ACK` per chunk |
 | `22` | `PATTERN_NAME` | host → device | `ACK` |
+| `23` | `CONDITION_REQUEST` | host → device | `CONDITION_DUMP` |
+| `24` | `CONDITION_DUMP` | device → host | — |
+| `25` | `CONDITION_SET` | host → device | `ACK` |
 | `30` | `GLOBALS_REQUEST` | host → device | `GLOBALS_DUMP` |
 | `31` | `GLOBALS_DUMP` | both | to device: `ACK` |
 | `40` | `PARAM_GET` | host → device | `PARAM_VALUE` |
@@ -131,6 +134,7 @@ Receive rules (device side; hosts should apply the same):
 | `44` | `ECHO_SET` | host → device | `ACK` |
 | `45` | `EVENT` | device → host | — |
 | `46` | `FX_FREEZE` | host → device | none (only `NAK` on error) |
+| `47` | `SEQ_BEAT_REPEAT` | host → device | none (only `NAK` on error) |
 | `7E` | `ACK` | device → host | — |
 | `7F` | `NAK` | device → host | — |
 
@@ -195,12 +199,13 @@ Capability bits:
 | 5 | `SAVE` flag (SD card writes) |
 | 6 | CPU meter fields in `STATUS_REPLY` and the `STATUS_REQUEST` flags byte |
 | 7 | Feedback-FM drum engine, reserved-byte migration and `EngV01` kit trailer |
-| 8 | `FX_FREEZE` (`46`) supported |
+| 8 | Audio freeze FX control (`FX_FREEZE`) |
+| 9 | Per-step trig conditions (`23`–`25`) |
+| 10 | Sequencer beat-repeat control (`47`) |
 
 The capability field is a u14 value encoded as two 7-bit bytes, least
-significant first. This firmware reports `0x01FF` (wire bytes `7F 03`):
-bits 0–8 are set. Freeze-only firmware reports `0x017F` (`7F 02`);
-the FM extension adds bit 7 without changing freeze's bit 8.
+significant first. This firmware reports `0x07FF` (wire bytes `7F 0F`):
+bits 0–10 are set.
 
 Hosts must size their buffers from these numbers rather than hard-coding them.
 `NUM_PARAMS`, `END_OF_SOUND_PARAMETERS` and `PAR_BEGINNING_OF_GLOBALS` must
@@ -375,7 +380,8 @@ requested.
 
 The raw pattern data is `name[8]` followed by the 3649-byte pattern body
 described in [file-formats.md](file-formats.md#pattern-body). It is the `.pat`
-file minus the `PatV03` tag.
+file minus the version tag. The separate condition extension is not carried by
+this legacy-compatible pattern transfer.
 
 * Chunks carry at most **196 raw bytes** (224 bytes packed). The device sends
   `c = 19` chunks: 18 × 196 bytes plus a final 129 bytes. Hosts may use any
@@ -399,7 +405,32 @@ file minus the `PatV03` tag.
 * Writing the pattern that is currently playing is allowed; the switch-over
   is atomic.
 
-### 5.12 `GLOBALS_REQUEST` (`30`) / `GLOBALS_DUMP` (`31`)
+### 5.12 `CONDITION_REQUEST` (`23`), `CONDITION_DUMP` (`24`) and `CONDITION_SET` (`25`)
+
+Condition data is separate from `PATTERN_CHUNK`, so existing 3657-byte pattern
+transfers remain wire-compatible. A condition buffer contains 168 raw bytes
+(448 three-bit values, track-major and step-major; see
+[file-formats.md](file-formats.md#pattern-body)).
+
+`CONDITION_REQUEST` payload: `slot` (u7, `00`–`3F`, or `7F` for the active
+pattern). The reply is `CONDITION_DUMP`: `slot` (u7) followed by packed8
+condition bytes.
+
+`CONDITION_SET` payload: `slot` (u7), `flags` (u7; bit 0 = `SAVE`), then
+packed8 condition bytes. The decoded data must be exactly 168 bytes. The active
+pattern's undo/backup copy is updated with the RAM slot. With `SAVE`, the
+versioned V04 `.pat` file is also written. Reply `ACK(25, slot)`.
+
+### 5.13 `SEQ_BEAT_REPEAT` (`47`)
+
+Payload: `active` (u7, 0/1), `rate` (u7, 0–3). Rates are 16th, 8th, quarter
+and half note. When `active` is set, the current sequencer segment is looped
+until an inactive request arrives. Releasing the control resumes the natural
+sequencer position after the elapsed ticks; stopping or changing patterns
+releases the repeat. This is a sequencer-time control, independent of the
+audio freeze FX. No success reply is sent.
+
+### 5.14 `GLOBALS_REQUEST` (`30`) / `GLOBALS_DUMP` (`31`)
 
 Request has no payload. Dump:
 
@@ -420,7 +451,7 @@ This is the same order as `glo.cfg`. Host → device:
 * With `SAVE`, `glo.cfg` is written.
 * Reply `ACK(31, n)`.
 
-### 5.13 `PARAM_GET` (`40`) / `PARAM_VALUE` (`42`)
+### 5.15 `PARAM_GET` (`40`) / `PARAM_VALUE` (`42`)
 
 `PARAM_GET` payload: 1–64 × u14 parameter id.
 `PARAM_VALUE` payload: the same number of `(u14 id, u14 value)` pairs, in
@@ -428,7 +459,7 @@ request order.
 
 Any id ≥ `NUM_PARAMS` → `NAK(40, ERR_RANGE, id)`.
 
-### 5.14 `PARAM_SET` (`41`)
+### 5.16 `PARAM_SET` (`41`)
 
 Payload: 1–64 × `(u14 id, u14 value)`.
 
@@ -448,14 +479,14 @@ Payload: 1–64 × `(u14 id, u14 value)`.
 Example: set parameter 3 to 100:
 `F0 7D 4C 7F 01 41 03 00 64 00 58 F7`
 
-### 5.15 `ECHO_SET` (`44`)
+### 5.17 `ECHO_SET` (`44`)
 
 Payload: u7 `0` = off, `1` = on. Sets `ParmEcho` for the running session (not
 saved to `glo.cfg`). Reply `ACK(44, state)`. A typical editor sends
 `ECHO_SET 1` after a successful identity request and `ECHO_SET 0` on
 disconnect.
 
-### 5.16 `PARAM_NOTIFY` (`43`) / `EVENT` (`45`)
+### 5.18 `PARAM_NOTIFY` (`43`) / `EVENT` (`45`)
 
 See [section 7](#7-parameter-echo-device--host-notifications).
 `PARAM_NOTIFY` uses the same pair format as `PARAM_VALUE`, with up to 32 pairs.
@@ -472,7 +503,7 @@ See [section 7](#7-parameter-echo-device--host-notifications).
 | `01` | `KIT_CHANGED` | current kit slot | Edit buffer changed wholesale (kit load, project load, …). Re-request kit `7F` and globals. |
 | `02` | `PATTERN_CHANGED` | active pattern | Active pattern switched |
 
-### 5.17 `FX_FREEZE` (`46`)
+### 5.19 `FX_FREEZE` (`46`)
 
 Payload: u7 value. Engages or releases the freeze / beat repeat FX
 ([freeze.md](freeze.md)), like holding perf-mode steps 9–16 or NRPN 210:
@@ -494,7 +525,7 @@ Payload: u7 value. Engages or releases the freeze / beat repeat FX
 Example: engage at 1/16, then release:
 `F0 7D 4C 7F 01 46 05 3D F7`, `F0 7D 4C 7F 01 46 00 38 F7`
 
-### 5.18 `ACK` (`7E`) / `NAK` (`7F`)
+### 5.20 `ACK` (`7E`) / `NAK` (`7F`)
 
 | Field | `ACK` | `NAK` |
 |-------|-------|-------|

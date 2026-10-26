@@ -74,6 +74,9 @@ char currentFolder[13];
 #define NUM_TRACKS 7
 #define NUM_PATTERN 8*/
 #define STEPS_PER_PATTERN NUM_STEPS //64
+#define PATTERN_BODY_V3_LEN (NUM_TRACKS * (NUM_STEPS * sizeof(Step) \
+		+ NUM_STEPS * sizeof(uint8_t)) + NUM_TRACKS * NUM_BARS * sizeof(uint16_t) \
+		+ 1 + NUM_TRACKS + 1)
 
 
 #define FEXT_SOUND 	0
@@ -378,6 +381,7 @@ FRESULT preset_LoadTmpPat()
 		seq_copyPatternToBackupBuffer(seq_activePattern);
 		//frontParser_shownPattern = menu_playedPattern;
 		uint8_t patternNr = menu_playedPattern;
+		memset(seq_patternSet.seq_conditions[patternNr], 0, SEQ_CONDITION_BYTES);
 
 	//---------------- read pattern data -----------------------------
 
@@ -479,6 +483,12 @@ FRESULT preset_LoadTmpPat()
 			if(bytesRead == 0) success = 0;
 
 		}
+		if(success && f_size((FIL*)&SDFile) >= 1u + PATTERN_BODY_V3_LEN + SEQ_CONDITION_BYTES)
+		{
+			f_read((FIL*)&SDFile, seq_patternSet.seq_conditions[patternNr],
+					SEQ_CONDITION_BYTES, &bytesRead);
+			if(bytesRead != SEQ_CONDITION_BYTES) success = 0;
+		}
 
 		if( success == 0)
 		{
@@ -492,6 +502,7 @@ FRESULT preset_LoadTmpPat()
 #endif
 			return FR_INT_ERR;
 		}
+		seq_copyPatternToBackupBuffer(patternNr);
 
 		success=1;
 		//close the file handle
@@ -515,6 +526,14 @@ FRESULT preset_LoadTmpPat()
 
 }
 
+static FRESULT preset_writeExact(FIL *file, const void *data, UINT size)
+{
+	UINT bytesWritten = 0;
+	FRESULT res = f_write(file, data, size, &bytesWritten);
+	if(res != FR_OK) return res;
+	return bytesWritten == size ? FR_OK : FR_DISK_ERR;
+}
+
 FRESULT preset_saveTmpPat()
 {
 
@@ -527,7 +546,6 @@ FRESULT preset_saveTmpPat()
 #endif
 
 	FRESULT res;
-	UINT bytesWritten;
 	uint8_t presetNr = menu_playedPattern;
 	//lcd_clear();
 	//lcd_home();
@@ -546,16 +564,10 @@ FRESULT preset_saveTmpPat()
 	}
 
 	//write current preset nr to file
-	res = f_write((FIL*)&SDFile,(void*)&menu_playedPattern,1,&bytesWritten);
+	res = preset_writeExact((FIL*)&SDFile, &menu_playedPattern, 1);
 	if(res != FR_OK)
 	{
-		f_close((FIL*)&SDFile);
-#if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
-			HAL_TIM_Base_Stop_IT(&htim2);	//calc sample interrupt - prio 1
-#else
-
-#endif
-		return res;
+		goto writeFailed;
 	}
 
 	//write pattern data
@@ -568,9 +580,15 @@ FRESULT preset_saveTmpPat()
 		//---------------  write the step data (note, vol, prob, autom.) ---------------
 		for(uint8_t trk=0; trk<NUM_TRACKS;trk++)
 		{
-			f_write((FIL*)&SDFile,(const void*)&seq_patternSet.seq_subStepPattern[presetNr][trk][0],sizeof(Step)*STEPS_PER_PATTERN,&bytesWritten);
+			res = preset_writeExact((FIL*)&SDFile,
+					&seq_patternSet.seq_subStepPattern[presetNr][trk][0],
+					sizeof(Step) * STEPS_PER_PATTERN);
+			if(res != FR_OK) goto writeFailed;
 
-			f_write((FIL*)&SDFile,(const void*)&seq_patternSet.seq_stepTiming[presetNr][trk][0],sizeof(uint8_t)*STEPS_PER_PATTERN,&bytesWritten);
+			res = preset_writeExact((FIL*)&SDFile,
+					&seq_patternSet.seq_stepTiming[presetNr][trk][0],
+					sizeof(uint8_t) * STEPS_PER_PATTERN);
+			if(res != FR_OK) goto writeFailed;
 		}
 
 		//--------------- now the main step data ---------------
@@ -579,7 +597,8 @@ FRESULT preset_saveTmpPat()
 			for(uint8_t bar=0;bar<NUM_BARS; bar++)
 			{
 				const uint16_t mainStepData = seq_patternSet.seq_mainSteps[bar][presetNr][trk];
-				f_write((FIL*)&SDFile,(const void*)&mainStepData,sizeof(uint16_t),&bytesWritten);
+				res = preset_writeExact((FIL*)&SDFile, &mainStepData, sizeof(mainStepData));
+				if(res != FR_OK) goto writeFailed;
 			}
 		}
 
@@ -587,7 +606,9 @@ FRESULT preset_saveTmpPat()
 
 
 		//f_write((FIL*)&SDFile,(const void*)&activeParameters[PAR_SHUFFLE],sizeof(uint8_t),&bytesWritten);
-		f_write((FIL*)&SDFile,(const void*)&seq_patternSet.shuffle[presetNr],sizeof(uint8_t),&bytesWritten);
+		res = preset_writeExact((FIL*)&SDFile, &seq_patternSet.shuffle[presetNr],
+				sizeof(uint8_t));
+		if(res != FR_OK) goto writeFailed;
 
 		//----- pattern/track lengths ------
 		// we reuse the same call from above (when saving main step data)
@@ -598,16 +619,22 @@ FRESULT preset_saveTmpPat()
 		for(uint8_t trk=0; trk<NUM_TRACKS;trk++)
 		{
 				length = seq_patternSet.length[presetNr][trk] ;//seq_patternSet.seq_mainSteps[bar][pat][trk];
-				f_write((FIL*)&SDFile,(const void*)&length,sizeof(uint8_t),&bytesWritten);
+				res = preset_writeExact((FIL*)&SDFile, &length, sizeof(length));
+				if(res != FR_OK) goto writeFailed;
 		}
 
 		//write associated kit nr
-		f_write((FIL*)&SDFile,&seq_patternSet.kitNr[presetNr],sizeof(uint8_t),&bytesWritten);
+		res = preset_writeExact((FIL*)&SDFile, &seq_patternSet.kitNr[presetNr],
+				sizeof(uint8_t));
+		if(res != FR_OK) goto writeFailed;
+		res = preset_writeExact((FIL*)&SDFile,
+				seq_patternSet.seq_conditions[presetNr], SEQ_CONDITION_BYTES);
+		if(res != FR_OK) goto writeFailed;
 
 #endif
 
 	//close the file
-	f_close((FIL*)&SDFile);
+	res = f_close((FIL*)&SDFile);
 
 	//reset the lcd
 //	menu_repaintAll();
@@ -618,6 +645,13 @@ FRESULT preset_saveTmpPat()
 
 #endif
 
+	return res;
+
+writeFailed:
+	f_close((FIL*)&SDFile);
+#if USE_INTERRUPT_ONLY_DURING_SAVE_PROJ
+	HAL_TIM_Base_Stop_IT(&htim2);
+#endif
 	return res;
 }
 
@@ -1734,11 +1768,18 @@ FRESULT preset_savePatternSD(uint8_t presetNr)
 	res = f_write((FIL*)&SDFile,(void*)savefileNames[presetNr][PATTERN_NAMES],8,&bytesWritten);
 	if(res != FR_OK) return res;
 	//write version tag
-	res = f_write((FIL*)&SDFile,"PatV03",6,&bytesWritten);
+	res = f_write((FIL*)&SDFile,"PatV04",6,&bytesWritten);
 	if(res != FR_OK) return res;
 
 	//write pattern data
 	preset_writePatternData(presetNr);
+	res = f_write((FIL*)&SDFile, seq_patternSet.seq_conditions[presetNr],
+			SEQ_CONDITION_BYTES, &bytesWritten);
+	if(res != FR_OK || bytesWritten != SEQ_CONDITION_BYTES)
+	{
+		f_close((FIL*)&SDFile);
+		return res == FR_OK ? FR_DISK_ERR : res;
+	}
 
 	//close the file
 	f_close((FIL*)&SDFile);
@@ -1753,6 +1794,7 @@ FRESULT preset_savePatternSD(uint8_t presetNr)
 // returns 1 on success
 static uint8_t preset_readPatternData(uint8_t patternNr, uint8_t dataVersion)
 {
+	memset(seq_patternSet.seq_conditions[patternNr], 0, SEQ_CONDITION_BYTES);
 
 #if 0
 
@@ -2018,6 +2060,12 @@ static uint8_t preset_readPatternData(uint8_t patternNr, uint8_t dataVersion)
 		f_read((FIL*)&SDFile,(void*)&seq_patternSet.kitNr[patternNr],sizeof(uint8_t),&bytesRead);
 		if(bytesRead == 0) success = 0;
 
+	}
+	if(success && dataVersion >= 4)
+	{
+		f_read((FIL*)&SDFile, seq_patternSet.seq_conditions[patternNr],
+				SEQ_CONDITION_BYTES, &bytesRead);
+		if(bytesRead != SEQ_CONDITION_BYTES) success = 0;
 	}
 
 	return success;

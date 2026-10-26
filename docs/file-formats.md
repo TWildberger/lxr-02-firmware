@@ -80,19 +80,24 @@ project, so it decides the edit buffer and the current kit slot.
 > actually in the edit buffer, and restores it as the current kit. Files are
 > compatible both ways.
 
-## `.pat`: pattern (3663 bytes)
+## `.pat`: pattern
 
 | Offset | Size | Content |
 |--------|------|---------|
 | 0 | 8 | Pattern name |
-| 8 | 6 | Version tag `"PatV03"` (files without `PatV` are read as version 1) |
-| 14 | 3649 | [Pattern body](#pattern-body) |
+| 8 | 6 | Version tag `"PatV04"` (files without `PatV` are read as version 1) |
+| 14 | 3649 | Legacy-compatible [pattern body](#pattern-body) |
+| 3663 | 168 | Packed three-bit trig conditions (V04 only) |
 
-SysEx `PATTERN_CHUNK` transfers carry `name[8]` + body (3657 bytes), i.e. the
-`.pat` file without the version tag.
+V04 files are 3831 bytes. V01–V03 load with every condition set to `Always`.
+The base pattern body and SysEx `PATTERN_CHUNK` layout remain unchanged:
+transfers carry `name[8]` + the 3649-byte body (3657 bytes total), without the
+version tag or condition extension. Conditions use the separate SysEx commands
+documented in [sysex.md](sysex.md).
 
-`tmp.pat` (autosave of the playing pattern) is 1 byte pattern number + body,
-with no name and no tag.
+`tmp.pat` (autosave of the playing pattern) is 1 byte pattern number + the
+3649-byte body, followed by the same 168-byte conditions extension. Older
+autosaves without the extension load with all conditions set to `Always`.
 
 ### Pattern body
 
@@ -103,6 +108,13 @@ with no name and no tag.
 | 3640 | 1 | Shuffle |
 | 3641 | 7 | Track lengths, one per track (steps) |
 | 3648 | 1 | Kit number linked to the pattern |
+
+The V04 conditions extension is track-major, then step-major (448 trigs).
+Each trig is a three-bit value packed least-significant-bit first. Values are
+`0` Always, `1` every 2nd cycle, `2` every 3rd, `3` every 4th, `4` first of
+every 2 cycles, `5` first of every 3, `6` first of every 4, and `7` every
+cycle after the first. The track cycle starts at zero when playback starts or
+the pattern changes.
 
 Tracks: 0–2 Drum 1–3, 3 Snare/Clap, 4 Cymbal, 5 Closed hi-hat,
 6 Open hi-hat.

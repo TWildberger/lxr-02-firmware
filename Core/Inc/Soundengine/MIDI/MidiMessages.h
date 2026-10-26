@@ -500,6 +500,8 @@ extern Param2EnumsDefinition Param2Enums;
 #define FRONT_SEQ_TRIGGER_OUT1_PPQ 		0x37
 #define FRONT_SEQ_TRIGGER_OUT2_PPQ 		0x38
 #define FRONT_SEQ_TRIGGER_GATE_MODE 	0x39
+#define FRONT_SEQ_STEP_CONDITION		0x3A
+#define FRONT_SEQ_BEAT_REPEAT			0x3B
 
 //codec control messages
 #define EQ_ON_OFF						0x01

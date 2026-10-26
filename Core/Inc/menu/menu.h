@@ -200,6 +200,8 @@ enum NamesEnum
 	TEXT_ROTATION,
 	TEXT_STEP_FLAM,
 	TEXT_STEP_SHIFT,
+	TEXT_STEP_CONDITION,
+	TEXT_BEAT_REPEAT,
 	
 	//Global Parameters
 	TEXT_BPM,
@@ -406,7 +408,9 @@ enum shortNamesEnum
 	SHORT_FX,
 	SHORT_XRUNS,
 	SHORT_ENGINE,
-	SHORT_TIMBRE_DECAY
+	SHORT_TIMBRE_DECAY,
+	SHORT_CONDITION,
+	SHORT_BEAT_REPEAT
 	
 };
 //-----------------------------------------------------------------
@@ -548,7 +552,9 @@ enum longNamesEnum
 	LONG_FX,
 	LONG_XRUNS,
 	LONG_ENGINE,
-	LONG_TIMBRE_DECAY
+	LONG_TIMBRE_DECAY,
+	LONG_CONDITION,
+	LONG_BEAT_REPEAT
 	
 };
 

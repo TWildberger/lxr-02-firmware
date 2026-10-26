@@ -120,6 +120,17 @@ measured.
 
 Firmware: `2f179b5` · Image SHA-256: `46b8f317…` · Date: 2026-10-25 · Kit: `TKit1` (slot 16)
 
+## Sequencer condition storage estimate
+
+Packed conditions add 168 bytes per pattern (10,752 bytes across 64 patterns,
+about 2.8% of the MCU's 384 KiB RAM), plus a small set of cycle/repeat counters.
+The pattern table is in ordinary `.bss`, not the tightly budgeted ITCM/DTCM
+sections. Sequencer conditions add a small comparison to the existing step
+probability/ratchet path; their CPU cost has not been measured on hardware.
+Repeat changes sequencer indices only and does not add an audio FX algorithm or
+audio-buffer allocation. See the pending
+[hardware checklist](sequencer-features.md#hardware-validation-checklist).
+
 ## Plate reverb
 
 The reverb ([reverb.md](reverb.md)) is counted in **fx**.

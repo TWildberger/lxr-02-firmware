@@ -20,7 +20,7 @@
  },
  "firmware": {
   "base": "Erica Synths LXR-02 v1.7",
-  "source_commit": "c53feecdaaa1727cd922a37c5a30488499b80e53"
+  "source_commit": "e3cfe41734aca24786c10d27f52c4921c57f8422"
  },
  "counts": {
   "NUM_PARAMS": 305,
@@ -373,6 +373,28 @@
    "labels": [
     "old",
     "fbm"
+   ]
+  },
+  "28": {
+   "symbol": "MENU_STEP_CONDITION",
+   "labels": [
+    "ALw",
+    "2nd",
+    "3rd",
+    "4th",
+    "1:2",
+    "1:3",
+    "1:4",
+    "n1s"
+   ]
+  },
+  "29": {
+   "symbol": "MENU_BEAT_REPEAT",
+   "labels": [
+    "16t",
+    "8th",
+    "4th",
+    "2nd"
    ]
   }
  },
@@ -11412,9 +11434,35 @@
    "symbol": "PAR_UNUSED",
    "scope": "pattern",
    "reserved": true,
-   "dtype": "0B127",
+   "name": {
+    "short": "cnd",
+    "category": "Step",
+    "long": "Condition"
+   },
+   "dtype": "MENU",
    "min": 0,
-   "max": 127,
+   "max": 7,
+   "menu": "MENU_STEP_CONDITION",
+   "labels": [
+    "ALw",
+    "2nd",
+    "3rd",
+    "4th",
+    "1:2",
+    "1:3",
+    "1:4",
+    "n1s"
+   ],
+   "ui": [
+    {
+     "page": "SEQ_PAGE",
+     "page_label": "Seq",
+     "subpage": 0,
+     "subpage_label": "1",
+     "slot": 3,
+     "label": "cnd"
+    }
+   ],
    "midi": null
   },
   {
@@ -11422,26 +11470,30 @@
    "symbol": "PAR_PATTERN_NEXT",
    "scope": "pattern",
    "reserved": false,
+   "name": {
+    "short": "rpt",
+    "category": "Pattern",
+    "long": "BeatRepeat"
+   },
    "dtype": "MENU",
    "min": 0,
-   "max": 14,
-   "menu": "MENU_NEXT_PATTERN",
+   "max": 3,
+   "menu": "MENU_BEAT_REPEAT",
    "labels": [
-    "p1",
-    "p2",
-    "p3",
-    "p4",
-    "p5",
-    "p6",
-    "p7",
-    "p8",
-    "r2",
-    "r3",
-    "r4",
-    "r5",
-    "r6",
-    "r7",
-    "r8"
+    "16t",
+    "8th",
+    "4th",
+    "2nd"
+   ],
+   "ui": [
+    {
+     "page": "PATTERN_SETTINGS_PAGE",
+     "page_label": "Pattern Settings",
+     "subpage": 0,
+     "subpage_label": "1",
+     "slot": 0,
+     "label": "rpt"
+    }
    ],
    "midi": null
   },

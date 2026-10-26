@@ -128,6 +128,7 @@ add_library(lxr_midi OBJECT
 add_library(lxr_sequencer OBJECT
     Src/Soundengine/Sequencer/clockSync.c
     Src/Soundengine/Sequencer/EuklidGenerator.c
+    Src/Soundengine/Sequencer/SeqCondition.c
     Src/Soundengine/Sequencer/sequencer.c
 )
 

@@ -173,6 +173,8 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_ROTATION, CAT_EUKLID, LONG_ROTATION}, 		//TEXT_ROTATION
 		{SHORT_FLAM, CAT_STEP, LONG_FLAM}, 		//TEXT_FLAM
 		{SHORT_SHIFT, CAT_STEP, LONG_SHIFT}, 		//TEXT_SHIFT
+		{SHORT_CONDITION, CAT_STEP, LONG_CONDITION}, 	//TEXT_STEP_CONDITION
+		{SHORT_BEAT_REPEAT, CAT_PATTERN, LONG_BEAT_REPEAT}, //TEXT_BEAT_REPEAT
 
 
 		{SHORT_BPM,CAT_GLOBAL,LONG_TEMPO},					//TEXT_BPM
@@ -539,8 +541,8 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 	    /*PAR_P1_VAL*/ 			DTYPE_0B127,							//240
 	    /*PAR_P2_VAL*/ 			DTYPE_0B127,
 	    /*PAR_SHUFFLE*/ 		DTYPE_0B127,
-	    /*PAR_UNUSED*/ 			DTYPE_0B127,
-	    /*PAR_PATTERN_NEXT*/ 	DTYPE_MENU | (MENU_NEXT_PATTERN<<8),
+	    /*PAR_UNUSED*/ 			DTYPE_MENU | (MENU_STEP_CONDITION<<8),
+	    /*PAR_PATTERN_NEXT*/ 	DTYPE_MENU | (MENU_BEAT_REPEAT<<8),
 	    /*PAR_TRACK_LENGTH*/ 	DTYPE_1B64,
 	    /*PAR_GLO_SAT*/			DTYPE_0B127,
 	    /*PAR_POS_Y*/ 			DTYPE_0B127,
@@ -2698,6 +2700,10 @@ static uint8_t getMaxEntriesForMenu(uint8_t menuId)
 
 	case MENU_STEP_SHIFT:
 			return stepShiftNames[0][0];
+	case MENU_STEP_CONDITION:
+		return stepConditionNames[0][0];
+	case MENU_BEAT_REPEAT:
+		return beatRepeatNames[0][0];
 
 	default:
 		return 0;
@@ -2808,6 +2814,12 @@ static void getMenuItemNameForValue(const uint8_t menuId, const uint8_t curParmV
 
 	case MENU_STEP_SHIFT:
 		p=stepShiftNames[curParmVal+1];
+		break;
+	case MENU_STEP_CONDITION:
+		p=stepConditionNames[curParmVal+1];
+		break;
+	case MENU_BEAT_REPEAT:
+		p=beatRepeatNames[curParmVal+1];
 		break;
 
 
@@ -3578,6 +3590,10 @@ void menu_parseGlobalParam(uint16_t paramNr, uint8_t value)
 
 	case PAR_SHUFFLE:
 		frontPanel_sendData(SEQ_CC,SEQ_SHUFFLE,value);
+		break;
+
+	case PAR_UNUSED:
+		frontPanel_sendData(SEQ_CC, SEQ_STEP_CONDITION, value);
 		break;
 
 	case PAR_AUTOM_TRACK:
