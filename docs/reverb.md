@@ -64,8 +64,10 @@ max 0 → 2 (`off`/`Plt`/`Eco`).
   `FX_BUFFER` (delay, reverb) and another FX left data there, the buffer is
   cleared first with a word-wise clear (≈16 k cycles, once). Only one of these
   FX types can be active at a time.
-* **CPU:** see [performance.md](performance.md#plate-reverb). The reverb's time
-  is counted in the `fx` bucket of the CPU meter.
+* **CPU:** measured on hardware, `Plt` uses about 11.5% of the block time and
+  `Eco` about 6.7%. Type `off` uses 0.5%. See
+  [performance.md](performance.md#plate-reverb). The reverb's time is counted
+  in the `fx` bucket of the CPU meter.
 * **Code:** the reverb runs from flash (I-cache). It adds no ITCM code. The
   FX parameter setters moved out of ITCM, so ITCM use went *down* 408 bytes.
 
