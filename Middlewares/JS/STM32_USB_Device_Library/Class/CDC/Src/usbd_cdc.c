@@ -59,6 +59,7 @@
 #include "usbd_cdc.h"
 
 #include "usbd_ctlreq.h"
+#include "Sysex/SysexHandler.h"
 
 
 /** @addtogroup STM32_USB_DEVICE_LIBRARY
@@ -956,6 +957,21 @@ static uint8_t  USBD_CDC_DataOut (USBD_HandleTypeDef *pdev, uint8_t epnum)
 		hcdc->RxBuffer[i] = 0;
 
 		uint8_t length=0;
+
+		// SysEx bytes go to the SysEx handler instead of the message queue
+		if ((usbData.cin&0xf0) == 0)
+		{
+			const uint8_t cin = usbData.cin & 0x0f;
+			uint8_t sysexLen = 0;
+			if(cin == CIN_SYSEX_START || cin == CIN_SYSEX_END_3) sysexLen = 3;
+			else if(cin == CIN_SYSEX_END_2) sysexLen = 2;
+			else if(cin == CIN_SYSEX_END_1 && (usbData.status == 0xF7 || usbData.status < 0x80)) sysexLen = 1;
+			if(sysexLen)
+			{
+				sysex_rxBytesUsb(&hcdc->RxBuffer[i+1], sysexLen);
+				continue;
+			}
+		}
 
 		//TODO MIDI parsing can be improved
 		// we only have cable 0

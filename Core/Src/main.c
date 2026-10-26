@@ -48,6 +48,7 @@ typedef struct ImageFileHeaderStruct
 #include "Soundengine/DSPAudio/random.h"
 #include "Soundengine/USB/usb_manager.h"
 #include "Soundengine/MIDI/Uart.h"
+#include "Sysex/SysexHandler.h"
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -354,8 +355,8 @@ lcd_clear();
 lcd_string("Sonic Potions");
 //goto 2nd line
 lcd_setcursor(0,2);
-lcd_string("LXR2 Drums V");
-lcd_string(FIRMWARE_VERSION);
+lcd_string("LXR2 V");
+lcd_string(FIRMWARE_VERSION); // 16 characters per line
 #endif
 
 lcd_showSplash();
@@ -915,6 +916,8 @@ lcd_process_display_interrupt = 1;
 
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 3, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
+  sysex_init();
   while (1)
   {
   checkMainLoc = -14;
@@ -987,6 +990,9 @@ lcd_process_display_interrupt = 1;
 
 		//process midi on midi port
 			uart_processMidi();
+
+	  //SysEx requests, replies and parameter echo
+	  sysex_tick();
 
 	  //check if we have to save something
 	  preset_processTimer();

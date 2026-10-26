@@ -29,6 +29,7 @@
 #include "Soundengine/USB/usb_manager.h"
 #include "menu/menu.h"
 #include "Soundengine/FxBus.h"
+#include "Sysex/SysexHandler.h"
 
 #include "Soundengine/MIDI/MidiMessages.h"
 
@@ -1712,6 +1713,11 @@ uint8_t midiParser_cc2voiceNr(uint8_t cc)
 }
 
 //-----------------------------------------------------------
+uint8_t midiParser_isUsb2MidiRouted(void)
+{
+	return midiParser_routing.route.usb2midi;
+}
+//-----------------------------------------------------------
 /** Parse incoming midi messages and invoke corresponding action
  */
 void midiParser_parseMidiMessage(MidiMsg msg)
@@ -1735,8 +1741,11 @@ void midiParser_parseMidiMessage(MidiMsg msg)
 		}
 	}
 
+	if(msg.bits.source==midiSourceMIDI)
+		sysex_rxDinMessage(msg.status, msg.bits.sysxbyte);
+
 	if(msg.bits.sysxbyte)
-		return; // no further action needed. we don't interpret sysex data right now
+		return; // SysEx data is handled by SysexHandler
 
 	// FILT filter messages here. Filter inline below to be more optimal
 	// we are interested in the low nibble since we are Rx here

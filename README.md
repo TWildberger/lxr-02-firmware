@@ -63,12 +63,15 @@ When the build has finished it shows where the update file is and how to install
 ```
 ======================================================================
   Firmware update file:
-    .../lxr_desktop_app/build/release/LXR_V2_V1.7.img
+    .../lxr_desktop_app/build/release/LXR_V2_V1.7-sx.img
   ...
 ```
 
 The version in the file name, and on the LXR's start-up screen, is set by `project(VERSION ...)` in
-[CMakeLists.txt](CMakeLists.txt).
+[CMakeLists.txt](CMakeLists.txt). Builds of this fork add the suffix `-sx` (`LXR_FW_SUFFIX`), for the
+SysEx protocol described in [docs/sysex.md](docs/sysex.md).
+
+The SysEx codec has host-side unit tests that run on your computer: `make -C tests/host`.
 
 ### Installing the update
 

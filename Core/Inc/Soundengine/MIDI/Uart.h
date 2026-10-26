@@ -25,6 +25,15 @@ void initMidiUart();
 void uart_sendMidi(MidiMsg msg);
 
 void uart_sendMidiByte(uint8_t data);
+
+// SysEx output: Begin returns 0 while older MIDI bytes are still queued. Between
+// Begin and End other bytes (except realtime) are held back. Put returns 0 when
+// the TX FIFO is full (retry later).
+uint8_t uart_sysexTxBegin(void);
+uint8_t uart_sysexTxPut(uint8_t data);
+void uart_sysexTxEnd(void);
+// moves held back bytes to the TX FIFO, call regularly from the main loop
+void uart_txPoll(void);
 //check if there is some received data in the Rx buffer and send it to the midi parser
 void uart_processMidi();
 

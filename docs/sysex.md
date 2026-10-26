@@ -37,6 +37,12 @@ Related documents:
   timeout or a checksum `NAK`.
 * Maximum accepted frame length (F0 … F7 inclusive) is **320 bytes**. It is
   also reported in the identity reply.
+* On DIN, MIDI clock and other realtime bytes can appear in the middle of a
+  SysEx frame, which the MIDI spec allows. Other outgoing MIDI (notes, CCs) is
+  held back until the frame ends.
+* On USB, if the host stops reading (for example no application has the port
+  open) for more than 100 ms, the device drops outgoing USB data, including
+  SysEx replies, until the host reads again. DIN is not affected.
 
 Rough throughput: DIN MIDI moves ≈3 kB/s, so a kit dump (≈300 bytes) takes
 ≈0.1 s and a pattern dump (≈4.3 kB) ≈1.4 s. USB is much faster.
@@ -259,8 +265,9 @@ Host → device:
 | flags | u7 |
 
 Copies the edit buffer into the slot and makes it the current kit. This is the
-same as *save kit* on the device. With `SAVE`, the `.snd` file is written too.
-Reply `ACK(12, slot)`.
+same as *save kit* on the device. The slot takes the name of the current kit
+(rename it with `KIT_NAME` before or after). With `SAVE`, the `.snd` file is
+written too. Reply `ACK(12, slot)`.
 
 ### 5.8 `KIT_LOAD` (`13`)
 
@@ -289,7 +296,8 @@ a dump) to persist it. Reply `ACK(cc, slot)`.
 | slot | u7 (`00`–`3F`, `7F` = active pattern) |
 
 The device answers with all chunks of the pattern, back to back. The host does
-not acknowledge them.
+not acknowledge them. The chunks carry the real slot number, also when `7F` was
+requested.
 
 ### 5.11 `PATTERN_CHUNK` (`21`)
 
@@ -456,8 +464,8 @@ With `ParmEcho` on (global menu or `ECHO_SET 1`):
 * Notifications go to the port of the most recent valid SysEx request, or to
   both ports if there has been none since power-up. They are held back while
   a reply is being sent.
-* Not reported in v1: step/pattern edits, mutes, transport state. Re-request
-  the pattern or `STATUS` if you need them.
+* Not reported in v1: step/pattern edits (including ids 247–271), mutes,
+  transport state. Re-request the pattern or `STATUS` if you need them.
 
 ## 8. Typical host sequences
 

@@ -24,6 +24,7 @@
 #include "lcd.h"
 //#include <util/atomic.h>
 #include "Preset/PresetManager.h"
+#include "Sysex/SysexHandler.h"
 //--
 
 static uint8_t frontParser_rxCnt=0;
@@ -49,6 +50,7 @@ void frontParser_parseNrpn(uint8_t value)
 
 	if(paramNr < NUM_PARAMS) {
 			activeParameters[paramNr] = value;
+			sysex_markExternalChange(paramNr);
 	}
 	
 	if( (paramNr >= PAR_TARGET_LFO1) && (paramNr <= PAR_TARGET_LFO6) )
@@ -133,6 +135,7 @@ void frontPanel_ccHandler()
 	{
 		activeParameters[parNr] = frontParser_midiMsg.data2;
 	}
+	sysex_markExternalChange(parNr);
 	
 	//repaint the LCD
 	menu_repaint();

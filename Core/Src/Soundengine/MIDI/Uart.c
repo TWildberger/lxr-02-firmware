@@ -45,6 +45,8 @@ void uart_clearFrontFifo()
 	fifoBig_clear(&fifo_frontRx);
 }
 //-----------------------------------------------------------------------------
+static uint8_t uart_txRefillFromDeferred(void);
+//-----------------------------------------------------------------------------
 void USART3_IRQHandler(void)
 {
 	uint32_t isrflags = READ_REG((&huart3)->Instance->ISR);
@@ -76,6 +78,11 @@ void USART3_IRQHandler(void)
     {
       USART3->TDR = (data & (uint16_t)0x01FF);
     }
+    else if (uart_txRefillFromDeferred() && fifo_bufferOut(&fifo_midiTx,&data) == 1)
+    {
+      // bytes held back during a SysEx frame
+      USART3->TDR = (data & (uint16_t)0x01FF);
+    }
     else // If buffer empty
     {
       // Disable Transmit Data Register empty interrupt
@@ -105,15 +112,117 @@ void uart_sendMidi(MidiMsg msg)
 
 }
 //-----------------------------------------------------------------------------
+// While a SysEx frame is being sent, other MIDI bytes (except realtime) wait in
+// fifo_midiDeferred so they are not inserted into the frame.
+static Fifo fifo_midiDeferred;
+static volatile uint8_t uart_sysexTxActive = 0;
+
+static inline uint8_t uart_fifoFull(const Fifo *fifo)
+{
+	return ((fifo->write + 1) & BUFFER_MASK) == fifo->read;
+}
+static inline uint8_t uart_fifoEmpty(const Fifo *fifo)
+{
+	return fifo->read == fifo->write;
+}
+static inline uint8_t uart_fifoUsed(const Fifo *fifo)
+{
+	return (uint8_t)((fifo->write - fifo->read) & BUFFER_MASK);
+}
+// SysEx may only fill this much of fifo_midiTx so realtime bytes (clock) are
+// never dropped and wait for at most a few ms
+#define UART_SYSEX_TX_MAX_QUEUED	16
+// interrupts must be disabled
+static void uart_moveDeferred(void)
+{
+	uint8_t data;
+	while(!uart_fifoEmpty(&fifo_midiDeferred) && !uart_fifoFull(&fifo_midiTx))
+	{
+		fifo_bufferOut(&fifo_midiDeferred, &data);
+		fifo_bufferIn(&fifo_midiTx, data);
+	}
+	if(!uart_fifoEmpty(&fifo_midiTx))
+		__HAL_UART_ENABLE_IT(&huart3, UART_IT_TXE);
+}
+// called from the TXE interrupt when fifo_midiTx ran empty
+static uint8_t uart_txRefillFromDeferred(void)
+{
+	uint8_t moved = 0;
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if(!uart_sysexTxActive && !uart_fifoEmpty(&fifo_midiDeferred))
+	{
+		uart_moveDeferred();
+		moved = 1;
+	}
+	__set_PRIMASK(primask);
+	return moved;
+}
+//-----------------------------------------------------------------------------
 void uart_sendMidiByte(uint8_t data)
 {
-	//put data in the output fifo
-	fifo_bufferIn(&fifo_midiTx,data);
+	// called from the main loop and from interrupts
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
 
-	//enable Transmit Data Register empty interrupt
-	__HAL_UART_ENABLE_IT(&huart3, UART_IT_TXE);
+	if(data < 0xF8 && (uart_sysexTxActive || !uart_fifoEmpty(&fifo_midiDeferred)))
+	{
+		fifo_bufferIn(&fifo_midiDeferred, data);
+	}
+	else
+	{
+		//put data in the output fifo
+		fifo_bufferIn(&fifo_midiTx,data);
+		//enable Transmit Data Register empty interrupt
+		__HAL_UART_ENABLE_IT(&huart3, UART_IT_TXE);
+	}
 
+	__set_PRIMASK(primask);
 };
+//-----------------------------------------------------------------------------
+void uart_txPoll(void)
+{
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if(!uart_sysexTxActive) uart_moveDeferred();
+	__set_PRIMASK(primask);
+}
+//-----------------------------------------------------------------------------
+uint8_t uart_sysexTxBegin(void)
+{
+	uint8_t ok = 0;
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if(!uart_sysexTxActive) uart_moveDeferred();
+	if(uart_fifoEmpty(&fifo_midiDeferred))
+	{
+		uart_sysexTxActive = 1;
+		ok = 1;
+	}
+	__set_PRIMASK(primask);
+	return ok;
+}
+//-----------------------------------------------------------------------------
+uint8_t uart_sysexTxPut(uint8_t data)
+{
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	uint8_t ok = 0;
+	if(uart_fifoUsed(&fifo_midiTx) < UART_SYSEX_TX_MAX_QUEUED)
+		ok = fifo_bufferIn(&fifo_midiTx, data);
+	__HAL_UART_ENABLE_IT(&huart3, UART_IT_TXE);
+	__set_PRIMASK(primask);
+	return ok;
+}
+//-----------------------------------------------------------------------------
+void uart_sysexTxEnd(void)
+{
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	uart_sysexTxActive = 0;
+	uart_moveDeferred();
+	__set_PRIMASK(primask);
+}
 //-----------------------------------------------------------------------------
 void uart_processFront()
 {
@@ -165,6 +274,7 @@ void initMidiUart()
 {
 	//init the fifo
 	fifo_init(&fifo_midiTx);
+	fifo_init(&fifo_midiDeferred);
 	fifo_init(&fifo_midiRx);
 
 	/*

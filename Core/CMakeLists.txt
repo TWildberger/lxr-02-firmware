@@ -31,7 +31,10 @@ add_library(lxr_platform OBJECT
 )
 # Shown on the boot splash screen; comes from project(VERSION) in the top-level CMakeLists.txt.
 set_source_files_properties(Src/main.c PROPERTIES
-    COMPILE_DEFINITIONS "FIRMWARE_VERSION=\" ${PROJECT_VERSION}\""
+    COMPILE_DEFINITIONS "FIRMWARE_VERSION=\" ${PROJECT_VERSION}${LXR_FW_SUFFIX}\""
+)
+set_source_files_properties(Src/Sysex/SysexHandler.c PROPERTIES
+    COMPILE_DEFINITIONS "LXR_FW_MAJOR=${PROJECT_VERSION_MAJOR};LXR_FW_MINOR=${PROJECT_VERSION_MINOR};LXR_FW_VERSION_STRING=\"${PROJECT_VERSION}${LXR_FW_SUFFIX}\""
 )
 
 # Hardware inputs/outputs: shift-register buttons/LEDs, pots & faders.
@@ -118,6 +121,8 @@ add_library(lxr_midi OBJECT
     Src/Soundengine/MIDI/MidiVoiceControl.c
     Src/Soundengine/MIDI/ParameterArray.c
     Src/Soundengine/MIDI/Uart.c
+    Src/Sysex/SysexCodec.c
+    Src/Sysex/SysexHandler.c
 )
 
 # Step sequencer, Euclidean generator, external clock sync.
