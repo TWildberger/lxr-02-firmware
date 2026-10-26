@@ -143,6 +143,11 @@ Do not enable additional engines or FX in this layer.
 
 ### Hardware acceptance checklist (not yet run)
 
+One five-minute workload with all three feedback-FM engines enabled in the
+live edit buffer was measured on hardware; see the
+[long-run result](performance.md#feedback-fm-long-run-measurement). That single
+scenario does not complete the broader acceptance checks below.
+
 1. Back up the SD card, flash the release image, and compare representative
    factory/user kits against the freeze build with `eng=old`, including kits
    containing non-panel-range waveform/transient bytes.
