@@ -270,6 +270,9 @@ enum NamesEnum
 	TEXT_FX_P3,
 	TEXT_FX_P4,
 	TEXT_PATTERN_MODE,
+	TEXT_SYSEX_ENABLE,
+	TEXT_SYSEX_DEVICE_ID,
+	TEXT_SYSEX_ECHO,
 
 
 	NUM_NAMES
@@ -379,8 +382,10 @@ enum shortNamesEnum
 	SHORT_P4,
 	SHORT_KCM,
 	SHORT_FLAM,
-	SHORT_SHIFT
-
+	SHORT_SHIFT,
+	SHORT_SYSEX,
+	SHORT_DEVICE_ID,
+	SHORT_ECHO
 	
 };
 //-----------------------------------------------------------------
@@ -508,7 +513,10 @@ enum longNamesEnum
 	LONG_P4,
 	LONG_PATTERN_MODE,
 	LONG_FLAM,
-	LONG_SHIFT
+	LONG_SHIFT,
+	LONG_SYSEX,
+	LONG_DEVICE_ID,
+	LONG_ECHO
 	
 };
 
@@ -682,6 +690,11 @@ uint8_t menu_getDisplayParameterType(uint8_t pos);
 uint8_t menu_parseKnobValue(uint8_t potNr, int16_t diff);
 //-----------------------------------------------------------------
 void menu_parseGlobalParam(uint16_t paramNr, uint8_t value);
+uint8_t menu_clampParamValue(uint16_t paramNr, uint16_t value);
+// loads a kit from the RAM kit table into the edit buffer, like the load page
+void menu_loadKit(uint8_t kitNr);
+// call after activeParameters was replaced from outside the menu
+void menu_editBufferReplaced(void);
 //-----------------------------------------------------------------
 /** all parameters are send to the cortex soundchip. called after loading a preset into the avr ram*/
 void menu_sendAllParameters();

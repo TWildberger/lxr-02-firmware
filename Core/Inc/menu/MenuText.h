@@ -480,6 +480,9 @@ const char shortNames[][4]  =
 	{"kcm"},
 	{"flm"},
 	{"shf"},
+	{"syx"},
+	{"id"},
+	{"ech"},
 
 };
 //-----------------------------------------------------------------
@@ -610,6 +613,9 @@ const char longNames[][16] =
 	{"KitChMde"},
 	{"Flam"},
 	{"Shift"},
+	{"SysEx"},
+	{"DeviceID"},
+	{"ParmEcho"},
 };
 
 

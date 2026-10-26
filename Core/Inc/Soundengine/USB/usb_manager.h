@@ -33,6 +33,12 @@ void usb_tick();
 void usb_sendMidi(MidiMsg msg);
 uint8_t usb_getMidi(MidiMsg* msg);
 void usb_flushMidi();
+// 1 when enumerated by a host
+uint8_t usb_isConfigured(void);
+// queues a complete F0 ... F7 frame as USB MIDI SysEx packets.
+// returns 0 (nothing queued) when there is not enough room, retry later.
+// returns 1 without queueing when the host has stopped reading (frame dropped)
+uint8_t usb_sendSysex(const uint8_t *frame, uint16_t len);
 
 #endif /* USB_MANAGER_H_ */
 

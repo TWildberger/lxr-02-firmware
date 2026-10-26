@@ -15,6 +15,7 @@
 #include "Soundengine/USB/usb_manager.h"
 #include <string.h>
 #include "usbd_cdc_if.h"
+extern USBD_HandleTypeDef hUsbDeviceFS;
 
 
 
@@ -87,63 +88,136 @@ void usb_start()
 }
 #endif
 //-------------------------------------------------------------------------------
-/*
- * writes a byte to the Usb Tx buffer
- * Will be send out by the usb_flushMidi() call
- */
-void usb_sendByte(uint8_t byte)
+// USB MIDI TX ring of 4 byte event packets, filled from the main loop and from
+// interrupts, sent by usb_flushMidi() in blocks of up to 64 bytes.
+#define USB_TX_RING_SIZE	1024
+#define USB_TX_RING_MASK	(USB_TX_RING_SIZE - 1)
+#define USB_TX_BLOCK_SIZE	64
+
+static uint8_t usb_txRing[USB_TX_RING_SIZE];
+static volatile uint16_t usb_txWr = 0;
+static volatile uint16_t usb_txRd = 0;
+static uint8_t usb_txStage[USB_TX_BLOCK_SIZE];
+// Set when the host stops reading the IN endpoint (e.g. no app has the port
+// open). Data is dropped until a transfer completes, so nothing waits on USB.
+#define USB_TX_STALL_MS		100
+static volatile uint8_t usb_txStalled = 0;
+static uint32_t usb_txStartTick = 0;
+
+static inline uint16_t usb_txFree(void)
 {
-
-	*usb_MidiInWrPtr++ = byte;
-	if(usb_MidiInWrPtr >= (usb_MidiInBuff+(TOTAL_MIDI_BUF_SIZE * NUM_SUB_BUFFERS)))
-	{
-		usb_MidiInWrPtr = usb_MidiInBuff;
-	}
-
+	return (uint16_t)((usb_txRd - usb_txWr - 1) & USB_TX_RING_MASK);
+}
+// interrupts must be disabled
+static inline void usb_txPut4(uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3)
+{
+	uint16_t wr = usb_txWr;
+	usb_txRing[wr] = b0; wr = (wr + 1) & USB_TX_RING_MASK;
+	usb_txRing[wr] = b1; wr = (wr + 1) & USB_TX_RING_MASK;
+	usb_txRing[wr] = b2; wr = (wr + 1) & USB_TX_RING_MASK;
+	usb_txRing[wr] = b3; wr = (wr + 1) & USB_TX_RING_MASK;
+	usb_txWr = wr;
+}
+//-------------------------------------------------------------------------------
+uint8_t usb_isConfigured(void)
+{
+	return hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED && hUsbDeviceFS.pClassData != NULL;
 }
 //------------------------------------------------------------------------------
 /*
- * flush FIFO and send out next block of messages stored in the usb_MidiInBuff
+ * send out the next block of queued packets
  * called periodically by usb_tick()
- * TODO:  maybe there is a better way to call this automatically by the USB driver when it is ready to TX some more data?
- * probably using the USBD_CDC_TransmitPacket() callback
  */
 void usb_flushMidi()
 {
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
 
-	//TODO: is this right???
-	const uint8_t len = usb_MidiInWrPtr - usb_MidiInRdPtr;
-	if(len!=0)
-	//if((len != 0) && (USB_OTG_dev.dev.device_status != USB_OTG_SUSPENDED))
+	if(!usb_isConfigured())
 	{
-
-	    /* Flush a Tx FIFO */
-	//    USB_FlushTxFifo (USB_OTG_FS, 15 ); //TODO is this needed? guess not
-	    // transmit next package
-	    // TODO clean up the USB-MIDI transmit buffer handling
-	    CDC_Transmit_FS(usb_MidiInRdPtr, len);
-
-		usb_MidiInRdPtr += len;
-		if(usb_MidiInRdPtr >= (usb_MidiInBuff+(TOTAL_MIDI_BUF_SIZE * NUM_SUB_BUFFERS)))
+		// nobody listening, drop queued data
+		usb_txRd = usb_txWr;
+		usb_txStalled = 0;
+	}
+	else if(((USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData)->TxState != 0)
+	{
+		if(HAL_GetTick() - usb_txStartTick > USB_TX_STALL_MS)
 		{
-			usb_MidiInRdPtr = usb_MidiInBuff;
+			usb_txStalled = 1;
+			usb_txRd = usb_txWr;
 		}
-		//usb_MidiInWrPtr=usb_MidiInRdPtr;
+	}
+	else if(usb_txRd != usb_txWr)
+	{
+		usb_txStalled = 0;
+		uint16_t rd = usb_txRd;
+		uint16_t n = 0;
+		while(rd != usb_txWr && n < USB_TX_BLOCK_SIZE)
+		{
+			usb_txStage[n++] = usb_txRing[rd];
+			rd = (rd + 1) & USB_TX_RING_MASK;
+		}
+		if(CDC_Transmit_FS(usb_txStage, n) == USBD_OK)
+		{
+			usb_txRd = rd;
+			usb_txStartTick = HAL_GetTick();
+		}
+	}
+	else
+	{
+		usb_txStalled = 0;
 	}
 
+	__set_PRIMASK(primask);
 }
 //------------------------------------------------------------------------------
 void usb_sendMidi(MidiMsg msg)
 {
 	//MIDI byte[0] = 4 bits cable number + 4 bits event type code
-	usb_sendByte(msg.status>>4);
-
 	//then the 3 midi message bytes
 	//USB MIDI msg has to be ALWAYS 4 bytes long
 	//even if it is just a single clock byte
-	usb_sendByte(msg.status);
-	usb_sendByte(msg.data1);
-	usb_sendByte(msg.data2);
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if(!usb_txStalled && usb_txFree() >= 4)
+		usb_txPut4(msg.status>>4, msg.status, msg.data1, msg.data2);
+	__set_PRIMASK(primask);
+}
+//------------------------------------------------------------------------------
+uint8_t usb_sendSysex(const uint8_t *frame, uint16_t len)
+{
+	if(len == 0) return 1;
+	const uint16_t needed = (uint16_t)(((len + 2) / 3) * 4);
+	if(needed > USB_TX_RING_SIZE - 1) return 1; // can never fit, drop
+
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if(usb_txStalled)
+	{
+		// host is not reading, drop the frame
+		__set_PRIMASK(primask);
+		return 1;
+	}
+	if(usb_txFree() < needed)
+	{
+		__set_PRIMASK(primask);
+		return 0;
+	}
+	// cable 0, CIN 4 = SysEx start/continue, CIN 5/6/7 = SysEx ends with 1/2/3 bytes
+	uint16_t i = 0;
+	while(len - i > 3)
+	{
+		usb_txPut4(0x04, frame[i], frame[i + 1], frame[i + 2]);
+		i += 3;
+	}
+	switch(len - i)
+	{
+	case 1: usb_txPut4(0x05, frame[i], 0, 0); break;
+	case 2: usb_txPut4(0x06, frame[i], frame[i + 1], 0); break;
+	default: usb_txPut4(0x07, frame[i], frame[i + 1], frame[i + 2]); break;
+	}
+	__set_PRIMASK(primask);
+	return 1;
 }
 //-------------------------------------------------------------------------------
 uint8_t usb_getMidi(MidiMsg* msg)

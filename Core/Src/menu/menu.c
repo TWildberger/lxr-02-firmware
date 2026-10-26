@@ -249,6 +249,9 @@ const Name valueNames[NUM_NAMES] =
 		{SHORT_P3, CAT_FX, LONG_P3},/*TEXT_FX_P3*/
 		{SHORT_P4, CAT_FX, LONG_P4},/*TEXT_FX_P4*/
 		{SHORT_KCM, CAT_GLOBAL, LONG_PATTERN_MODE},/*TEXT_AUTO_SWITCH_KIT*/
+		{SHORT_SYSEX, CAT_MIDI, LONG_SYSEX},		/*TEXT_SYSEX_ENABLE*/
+		{SHORT_DEVICE_ID, CAT_MIDI, LONG_DEVICE_ID},/*TEXT_SYSEX_DEVICE_ID*/
+		{SHORT_ECHO, CAT_MIDI, LONG_ECHO},			/*TEXT_SYSEX_ECHO*/
 
 
 };
@@ -565,6 +568,9 @@ const enum Datatypes PROGMEM parameter_dtypes[NUM_PARAMS] = {
 	    /*PAR_MIDI_NOTE6*/		DTYPE_NOTE_NAME,
 	    /*PAR_MIDI_NOTE7*/		DTYPE_NOTE_NAME,
 		/*PAR_PATTERN_MODE*/ DTYPE_MENU | (MENU_PAT_MODE<<8),
+		/*PAR_SYSEX_ENABLE*/	DTYPE_ON_OFF,
+		/*PAR_SYSEX_DEVICE_ID*/	DTYPE_1B16,
+		/*PAR_SYSEX_ECHO*/		DTYPE_ON_OFF,
 };
 
 
@@ -2191,19 +2197,7 @@ void menu_handleLoadSaveMenu(int8_t inc, uint8_t btnClicked)
 				case SAVE_TYPE_KIT:
 #if 1
 
-					preset_loadDrumsetRam(menu_selectedPresetNr[menu_saveOptions.category],0, 0);
-					menu_TargetVoiceGapIndex = getModTargetGapIndex(activeParameters[PAR_TARGET_LFO1 + menu_activeVoice]);
-
-					menu_loadedPresetNr[CURRENT_KIT] = menu_selectedPresetNr[menu_saveOptions.category];
-					//update autosave kit
-					preset_touchTimer(PRESET_KIT_TIMER);
-					//store selected kit in current pattern
-#if USE_PATTERN_EDIT_BUFFER
-					patternBackupBuffer.kitNr = menu_loadedPresetNr[CURRENT_KIT];
-
-#else
-					seq_patternSet.kitNr[seq_activePattern] = menu_loadedPresetNr[CURRENT_KIT];
-#endif
+					menu_loadKit(menu_selectedPresetNr[menu_saveOptions.category]);
 
 #else
 					preset_loadDrumset(menu_selectedPresetNr[menu_saveOptions.category],0);
@@ -3728,7 +3722,14 @@ static uint8_t limitPotValue(int8_t diff, uint16_t paramNr)
 			newValue = originalValue + diff;
 	}
 
-	//limit to range
+	return menu_clampParamValue(paramNr, newValue);
+}
+//-----------------------------------------------------------------
+// Limits a value to the legal range of a parameter (same limits as the front panel).
+uint8_t menu_clampParamValue(uint16_t paramNr, uint16_t value)
+{
+	if(paramNr >= NUM_PARAMS) return 0;
+	uint8_t newValue = value > 0xff ? 0xff : (uint8_t)value;
 
 	switch(parameter_dtypes[paramNr] & 0xFF)
 	{
@@ -4278,6 +4279,29 @@ uint8_t menu_getActivePage()
 {
 	return menu_activePage;
 };
+//----------------------------------------------------------------
+void menu_loadKit(uint8_t kitNr)
+{
+	preset_loadDrumsetRam(kitNr, 0, 0);
+	menu_editBufferReplaced();
+
+	menu_loadedPresetNr[CURRENT_KIT] = kitNr;
+	menu_selectedPresetNr[SAVE_TYPE_KIT] = kitNr;
+	//update autosave kit
+	preset_touchTimer(PRESET_KIT_TIMER);
+	//store selected kit in current pattern
+#if USE_PATTERN_EDIT_BUFFER
+	patternBackupBuffer.kitNr = menu_loadedPresetNr[CURRENT_KIT];
+#else
+	seq_patternSet.kitNr[seq_activePattern] = menu_loadedPresetNr[CURRENT_KIT];
+#endif
+}
+//----------------------------------------------------------------
+void menu_editBufferReplaced(void)
+{
+	// **LFOTARGFIX - save the gap index
+	menu_TargetVoiceGapIndex = getModTargetGapIndex(activeParameters[PAR_TARGET_LFO1 + menu_activeVoice]);
+}
 //----------------------------------------------------------------
 uint8_t menu_getActiveVoice()
 {

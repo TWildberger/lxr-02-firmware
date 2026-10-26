@@ -426,6 +426,12 @@ enum ParamEnums
 
 		PAR_PATTERN_MODE,
 
+	// SysEx editor protocol settings (see docs/sysex.md). Appended at the end so
+	// glo.cfg stays readable by stock firmware, which only reads the first 30 bytes.
+	PAR_SYSEX_ENABLE,					// bool - respond to SysEx requests
+	PAR_SYSEX_DEVICE_ID,				// 1-16, sent on the wire as 0-15
+	PAR_SYSEX_ECHO,						// bool - notify host of panel parameter edits
+
 	NUM_PARAMS	
 };
 
