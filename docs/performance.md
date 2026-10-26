@@ -120,29 +120,51 @@ measured.
 
 Firmware: `2f179b5` · Image SHA-256: `46b8f317…` · Date: 2026-10-25 · Kit: `TKit1` (slot 16)
 
-## Sequencer condition storage estimate
+## Sequencer conditions and beat-repeat resources
 
-Packed conditions add 168 bytes per pattern (10,752 bytes across 64 patterns),
-plus a 168-byte backup copy and about 45 bytes of cycle/repeat counters. Against
-the FM branch's 279,000-byte general-RAM baseline, that is about 289,965 bytes
-(73.7% of 384 KiB), before linker alignment. The pattern table and backup are
-ordinary `.bss`, not the tightly budgeted ITCM/DTCM sections. Sequencer
-conditions add a small comparison to the existing step probability/ratchet
-path; their CPU cost has not been measured on hardware. Repeat changes
-sequencer indices only and does not add an audio FX algorithm or audio-buffer
-allocation. It adds some code to the ITCM-resident sequencer tick; the local
-release build is blocked before compiling project sources. The project's
-documented `brew install --cask gcc-arm-embedded` installation requires an
-interactive `sudo` authorization, unavailable in the current non-interactive
-build session. The official Arm GNU 15.3.rel2 compiler is not installed or on
-`PATH`. The only discovered fallback is a cached Homebrew `arm-none-eabi-gcc`
-16.2 compiler; it lacks `nano.specs`, and CMake's compiler probe also aborts
-because its `cc1` cannot load `_ZSTD_compress`. CMake 4.4.3 and Ninja 1.13.2 are
-available. After an administrator installs the documented cask (or the
-official Arm `.pkg`), rerun
-`cmake --preset release --fresh -DARM_TOOLCHAIN_DIR=<toolchain-bin>` followed
-by `cmake --build --preset release` to measure the exact ITCM growth. See the
-pending
+Same-toolchain release builds of the FM base
+`efb655aa48d6d0c31803f0ae17974c9d7a54d63b` and sequencer code at `1f4b43c`,
+using Arm GNU 15.3.Rel2 (15.3.1), CMake 4.4.3 and Ninja 1.13.2. Linker maps and
+`--print-memory-usage` agree; region totals include alignment and veneers.
+
+| Region | FM base | Sequencer | Delta | Capacity |
+|--------|--------:|----------:|------:|---------:|
+| ITCM | 14,984 B | 15,920 B | +936 B | 16,384 B |
+| DTCM | 107,824 B | 107,824 B | 0 B | 131,072 B |
+| General RAM | 279,000 B | 289,980 B | +10,980 B | 393,216 B |
+| Flash region | 258,724 B | 263,204 B | +4,480 B | 1,015,808 B |
+
+Conditions add 168 bytes per pattern (10,752 bytes across 64 patterns), a
+168-byte backup and small cycle/repeat counters in ordinary `.bss`. DTCM is
+unchanged; general RAM is 73.75% used. Existing ITCM sequencer functions grow
+to 97.17% utilization overall, leaving only **464 bytes** of ITCM headroom.
+Further sequencer changes must be checked against this tight limit.
+
+The release build produces `build/release/LXR_V2_V1.7-sx.img`: **316,136 bytes**
+including its 16-byte update header (316,120-byte firmware payload), SHA-256
+`3fc6cc3cb22c3b1e3cd9d259b0a889e960f1967b220fa586123c713b4fe71c8d`.
+This contains the complete reverb/freeze/FM/sequencer chain, but not a
+bootloader for blank devices. It has not been flashed or hardware-tested.
+
+The build blocker was resolved without system installation: download the
+official Arm GNU 15.3.Rel2 macOS arm64 `.pkg`, verify its trusted ARM Ltd
+installer signature and SHA-256
+`779972fa545f738bfbba2ff0ae44d5ad7510b00cfb414702974844ba625412f3`
+(matching the Homebrew cask), then use `pkgutil --expand-full` in session-local
+storage. No installer scripts or `sudo` are needed. The extracted `Payload/bin`
+is supplied through the supported override:
+
+```sh
+cmake --preset release --fresh -DARM_TOOLCHAIN_DIR=<extracted-Payload/bin> \
+  -DCMAKE_MAKE_PROGRAM=<ninja-executable>
+cmake --build --preset release
+```
+
+Conditions add comparisons and packed lookups to the existing
+probability/ratchet path, while repeat changes indices and counters at step
+rate. There is no new per-sample DSP loop or audio buffer. CPU overhead is
+expected to be small relative to audio rendering, but remains unmeasured;
+host/build results do not establish real-time behavior. See the pending
 [hardware checklist](sequencer-features.md#hardware-validation-checklist).
 
 ## Plate reverb
