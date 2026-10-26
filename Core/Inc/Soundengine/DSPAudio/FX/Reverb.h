@@ -1,5 +1,5 @@
 /*
- * ReverbAlgo.h
+ * Reverb.h
  *
  *  Created on: 30.07.2014
  *      Author: julian
@@ -12,130 +12,100 @@
  * NOTICE.md. See LICENSE and NOTICE.md in the root of the repository.
  */
 
+/*
+ * Plate reverb for the FX bus (figure-8 tank after J. Dattorro, "Effect
+ * Design Part 1", JAES 1997).
+ *
+ * All delay lines live in one caller-provided __fp16 buffer of
+ * REVERB_BUFFER_SAMPLES samples (on the LXR this is the start of the shared
+ * FX_BUFFER, which the delay also uses). This module has no HAL/CMSIS
+ * dependency so it can be unit tested on the host (tests/host/test_reverb.c).
+ *
+ * Parameters (all 0..1):
+ *   preDelay  1..46 ms pre-delay
+ *   decay     RT60 0.3..19 s
+ *   tone      0.5 = neutral; <0.5 darker (input low-pass + loop damping),
+ *             >0.5 brighter (input high-pass, less damping)
+ *   early     early reflection level
+ * Type (PAR_FX_REVERB_TYPE):
+ *   REVERB_OFF    dry passthrough, same as FX type "off". Default, and the
+ *                 value found in older kits that were saved with FX type 5
+ *                 while the reverb was compiled out: they keep sounding dry.
+ *   REVERB_PLATE  tank runs at the full sample rate
+ *   REVERB_ECO    tank runs at half rate (~half the CPU, <=11 kHz wet
+ *                 bandwidth, delays twice as long -> larger room)
+ */
+
 #ifndef REVERBALGO_H_
 #define REVERBALGO_H_
-#include "Soundengine/globals.h"
-#include "Soundengine/config.h"
-#include "Soundengine/DSPAudio/FX/FxRamBuffer.h"
 
+#include <stdint.h>
 
-#include "Delay.h"
-#include "Soundengine/DSPAudio/TiltEq.h"
-#include "Soundengine/DSPAudio/FX/VerbTools/AllpassDelay.h"
-#include "Soundengine/DSPAudio/1PoleLp.h"
-#include "Soundengine/DSPAudio/FX/VerbTools/sinCos.h"
-#include "Soundengine/DSPAudio/FX/VerbTools/VerbModDelay.h"
-#include "Soundengine/DSPAudio/TiltEq.h"
-//#include "shaper.h"
+#ifndef REVERB_FS
+#define REVERB_FS 44140.f	// must match REAL_FS in Soundengine/config.h
+#endif
 
+#define REVERB_BUFFER_SAMPLES 20480u
 
-#define MAX_DELAY_SIZE MAX_ALLPASS_SIZE//(0x800)
-#define EARLY_TAPS 4
-
-#define USE_OUT_2 0
-#define USE_LOWER_DENSITY 1
-#define HIGH_RES_SINE_COS 0
-#define SPIN_SEMI 0
-
+enum ReverbTypeEnum
+{
+	REVERB_OFF,
+	REVERB_PLATE,
+	REVERB_ECO,
+	REVERB_NUM_TYPES
+};
 
 typedef struct ReverbStruct
 {
-#if SPIN_SEMI
-	AllpassDelay apDelay[4][2];
-#else
-	AllpassDelay apDelay[2];
-	AllpassModDelay apModDelay[2];
-#endif
-	AllpassDelay inputAllpass[4];
+	__fp16 *buf;
+	uint32_t w;				// shared write index for all lines
 
-#if SPIN_SEMI
-	VerbDelay delay[2];
-	VerbModDelay modDelay[2];
-#else
-	VerbDelay delay[4];
-#endif
-	VerbDelay earlyReflectionDelay;
-	VerbDelay preDelay;
-
-	SineCosine lfo;
+	float tank1;			// output of tank half 1 (feeds half 2)
+	float tank2;			// output of tank half 2 (feeds half 1)
+	float damp1;			// loop damping filter states
+	float damp2;
+	float toneState;		// input tilt filter state
 
 	float feedback;
-	float delayTime;
-	float earlyVolume;
+	float dampCoef;
+	float toneCoef;
+	float toneDry;			// tilt: out = toneDry*x + toneLp*lp
+	float toneLp;
+	float earlyGain;
+	uint32_t preDelay;		// in tank ticks
 
-	OnePoleFilter lpFeedback;
-	OnePoleFilter lpImpulse;
+	float lfoPhase;
+	float modA;				// current modulation excursion (ticks)
+	float modB;
 
-	volatile __fp16 *reverbBufferSram;
+	float lastL;			// last wet output (eco interpolation)
+	float lastR;
 
-	float lastOut;
-	float lastOut2;
-
-	TiltEq eq;
-	TiltEq eqFb;
-
+	float param[4];			// cached raw parameters, see Reverb_setParams
+	uint8_t type;
+	uint8_t clearPending;
 } Reverb;
 
-void Reverb_init(Reverb *r);
-void Reverb_process(Reverb *r, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet);
-void Reverb_setDelayTime(Reverb *r, float t);
-void Reverb_setFeedback(Reverb *r, float fb);
-void Reverb_setVariation(Reverb *r, float v);
-void Reverb_setComposition(Reverb *r, float c);
-
+// buf must hold REVERB_BUFFER_SAMPLES samples and be 4-byte aligned
+void Reverb_init(Reverb *r, __fp16 *buf);
+// silence the tank and all lines (also done lazily on the next process call
+// after init or a type change)
+void Reverb_clear(Reverb *r);
 
 /*
- * feedback = decay
- * time = pre delay
- * dry/wet = dry/wet
- *
- * size = room size
- * variation = diffusion
- * composition = damping
+ * Process one block.
+ * fxBuffer: interleaved stereo int16 FX bus input, size frames.
+ * out:      interleaved stereo int16 destination; the result is added with
+ *           saturation. channels == 2 writes out[2i] and out[2i+1],
+ *           channels == 1 writes only out[2i] (mono routing).
+ * size must be even.
  */
-/*
-class AllpassLoopVerb : public Delay
-{
-public:
-	AllpassLoopVerb();
-	virtual ~AllpassLoopVerb(){};
+void Reverb_process(Reverb *r, const int16_t *fxBuffer, int16_t *out, uint16_t size, uint8_t channels, float dryWet);
 
-private:
-	  AllpassDelay<revItg> apDelay[4][2];
-	  AllpassDelay<revItg> inputAllpass[4];
-
-	  VerbDelay<revItg,MAX_DELAY_SIZE> delay[2];
-	  VerbModDelay<revItg,MAX_DELAY_SIZE> modDelay[2];
-	  VerbDelay<revItg,MAX_DELAY_SIZE> earlyReflectionDelay;
-	  SineCosine lfo;
-	  OnePoleLp lpFeedback;
-	  OnePoleLp lpImpulse;
-
-	  float lastOut;
-
-	  Shaper feedbackShaper;
-
-	  volatile revItg *reverbBufferSram;
-
-	  inline revItg add(revItg a, revItg b)
-	  {
-		  return __QADD(a,b);
-	  }
-
-	  inline revItg sub(revItg a, revItg b)
-	  {
-		  return __QSUB(a,b);
-	  }
-
-public:
-	void process(int16_t* input1, int16_t* input2);
-	void setDelayTime(float t);
-	void setComposition(float c);
-	void setFeedback(float fb);
-	void setVariation(float v);
-
-};
-
-*/
+void Reverb_setPreDelay(Reverb *r, float p);
+void Reverb_setDecay(Reverb *r, float p);
+void Reverb_setTone(Reverb *r, float p);
+void Reverb_setEarly(Reverb *r, float p);
+void Reverb_setType(Reverb *r, uint8_t type);
 
 #endif /* REVERBALGO_H_ */

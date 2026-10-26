@@ -47,6 +47,11 @@ and restores the autosaved kit and pattern. Saving a project writes
 * Shorter files (older firmware with fewer sound parameters) are accepted.
   Missing parameters read as 0.
 * SysEx `KIT_DUMP` carries the same 255 bytes (see [sysex.md](sysex.md)).
+* FX type (`PAR_FX_TYPE`, offset 242) 5 is the plate reverb, and reverb type
+  (`PAR_FX_REVERB_TYPE`, offset 252) is 0 = `off`, 1 = `Plt`, 2 = `Eco`. Older
+  kits with FX type 5 have reverb type 0, so they still play the FX bus dry,
+  as on stock v1.7. Kits saved with the reverb on play the FX bus dry on stock
+  v1.7. See [reverb.md](reverb.md#compatibility).
 
 `tmp.snd` (autosave of the edit buffer) has a different layout: 1 byte kit
 slot number + 247 parameter bytes, and no name. At boot it is loaded after the

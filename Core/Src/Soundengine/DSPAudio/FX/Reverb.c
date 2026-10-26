@@ -1,7 +1,7 @@
 /*
  * Reverb.c
  *
- *  Created on: 31.08.2020
+ *  Created on: 30.07.2014
  *      Author: julian
  *
  * Copyright (C) 2012-2026 Erica Synths
@@ -12,717 +12,418 @@
  * NOTICE.md. See LICENSE and NOTICE.md in the root of the repository.
  */
 
-
 #include "Soundengine/DSPAudio/FX/Reverb.h"
-#include "Soundengine/DSPAudio/FX/FxRamBuffer.h"
-
-
-
-static const float earlyTaps[] =
-{
-		12,
-		24,
-		38,
-		50
-};
-
-void Reverb_init(Reverb *r)
-{
-
-	TiltEq_init(&r->eq);
-	TiltEq_init(&r->eqFb);
-
-	SineCosine_init(&r->lfo);
-	r->reverbBufferSram = (__fp16*)FX_BUFFER;
-
-	r->earlyVolume = 1.0f;
-
-
-	setOnePoleCoef(&r->lpFeedback, 0.5f);
-	setOnePoleCoef(&r->lpImpulse, 0.5f);
-
-		//feedbackShaper.setShape(0.7f);
-	r->lastOut = r->lastOut2 = 0;
-	SineCosine_setFreq(&r->lfo, 1.31f);
-	/*
-	AllpassDelay apDelay[2];
-		AllpassModDelay apModDelay[2];
-		*/
-#if SPIN_SEMI
-		for(int i=0;i<4;i++)
-		{
-			AllpassDelay_init(&r->apDelay[i][0]);
-			AllpassDelay_init(&r->apDelay[i][1]);
-			AllpassDelay_setBuffer(&r->apDelay[i][0], &r->reverbBufferSram[i*2*(MAX_ALLPASS_SIZE)]);
-			AllpassDelay_setBuffer(&r->apDelay[i][1], &r->reverbBufferSram[(i*2+1)*(MAX_ALLPASS_SIZE)]);
-			//apDelay[i][0].setBuffer(&reverbBufferSram[i*2*(MAX_ALLPASS_SIZE)]);
-			//apDelay[i][1].setBuffer(&reverbBufferSram[(i*2+1)*(MAX_ALLPASS_SIZE)]);
-		}
-
-		// 8 * MAX_ALLPASS_SIZE occupied
-
-		for(int i=0;i<4;i++)
-		{
-			AllpassDelay_init(&r->inputAllpass[i]);
-			//TODO could have way less memory -> max delay is 379 samples
-			//inputAllpass[i].setBuffer(&reverbBufferSram[8*MAX_ALLPASS_SIZE + i*(MAX_ALLPASS_SIZE)]);
-			AllpassDelay_setBuffer(&r->inputAllpass[i], &r->reverbBufferSram[8*MAX_ALLPASS_SIZE + i*(MAX_ALLPASS_SIZE)]);
-
-		}
-#else
-		for(int i=0;i<2;i++)
-		{
-			AllpassDelay_init(&r->apDelay[i]);
-			AllpassModDelay_init(&r->apModDelay[i]);
-
-			AllpassDelay_setBuffer(&r->apDelay[i], &r->reverbBufferSram[i*2*(MAX_ALLPASS_SIZE)]);
-			AllpassModDelay_setBuffer(&r->apModDelay[i], &r->reverbBufferSram[(i*2+1)*(MAX_ALLPASS_SIZE)]);
-		}
-
-		// 4 * MAX_ALLPASS_SIZE occupied
-
-		for(int i=0;i<4;i++)
-		{
-			AllpassDelay_init(&r->inputAllpass[i]);
-			//TODO could have way less memory -> max delay is 379 samples
-			//inputAllpass[i].setBuffer(&reverbBufferSram[8*MAX_ALLPASS_SIZE + i*(MAX_ALLPASS_SIZE)]);
-			AllpassDelay_setBuffer(&r->inputAllpass[i], &r->reverbBufferSram[4*MAX_ALLPASS_SIZE + i*(MAX_ALLPASS_SIZE)]);
-
-		}
-#endif
-
-
-#if SPIN_SEMI
-		// 12 * MAX_ALLPASS_SIZE occupied
-		for(int i=0;i<2;i++)
-		{
-			VerbDelay_init(&r->delay[i]);
-			VerbDelay_setBuffer(&r->delay[i], &r->reverbBufferSram[12 * MAX_ALLPASS_SIZE + i*MAX_DELAY_SIZE]);
-			//delay[i].setBuffer(&reverbBufferSram[12 * MAX_ALLPASS_SIZE + i*MAX_DELAY_SIZE]);
-		}
-		for(int i=0;i<2;i++)
-		{
-			VerbModDelay_init(&r->modDelay[i]);
-			//modDelay[i].setBuffer(&reverbBufferSram[14 * MAX_ALLPASS_SIZE + i*MAX_DELAY_SIZE]);
-			VerbModDelay_setBuffer(&r->modDelay[i], &r->reverbBufferSram[14 * MAX_ALLPASS_SIZE + i*MAX_DELAY_SIZE]);
-		}
-
-		VerbDelay_setBuffer(&r->earlyReflectionDelay, &r->reverbBufferSram[16 * MAX_ALLPASS_SIZE]);
-#else
-		// 8 * MAX_ALLPASS_SIZE occupied
-		for(int i=0;i<4;i++)
-		{
-			VerbDelay_init(&r->delay[i]);
-			VerbDelay_setBuffer(&r->delay[i], &r->reverbBufferSram[8 * MAX_ALLPASS_SIZE + i*MAX_DELAY_SIZE]);
-			//delay[i].setBuffer(&reverbBufferSram[12 * MAX_ALLPASS_SIZE + i*MAX_DELAY_SIZE]);
-		}
-
-
-
-		VerbDelay_init(&r->earlyReflectionDelay);
-		VerbDelay_setBuffer(&r->earlyReflectionDelay, &r->reverbBufferSram[12 * MAX_ALLPASS_SIZE]);
-
-		VerbDelay_init(&r->preDelay);
-		VerbDelay_setBuffer(&r->preDelay, &r->reverbBufferSram[13 * MAX_ALLPASS_SIZE]);
-#endif
-
-
-
-		VerbDelay_setLength(&r->earlyReflectionDelay , 2000);
-		//44 samples = 1ms, 2030 = 46ms
-		VerbDelay_setLength(&r->preDelay, 2031);
-
-
-		AllpassDelay_setDelay(&r->inputAllpass[0], 142);
-		AllpassDelay_setDelay(&r->inputAllpass[1], 107);
-		AllpassDelay_setDelay(&r->inputAllpass[2], 379);
-		AllpassDelay_setDelay(&r->inputAllpass[3], 277);
-
-		VerbDelay_setLength(&r->delay[0], 2047);
-		VerbDelay_setLength(&r->delay[1], 1913); //todo wieso habe ich nur halbe buffer size? größer 4096 geht nicht
-	//	delay[1].setLength(3090);
-
-#if SPIN_SEMI
-		VerbModDelay_setLength(&r->modDelay[0], 2047);
-		VerbModDelay_setLength(&r->modDelay[1], 1999);
-
-		AllpassDelay_setDelay(&r->apDelay[0][0], 672);
-		AllpassDelay_setDelay(&r->apDelay[0][1], 757);
-
-		AllpassDelay_setDelay(&r->apDelay[1][0], 1800);
-		AllpassDelay_setDelay(&r->apDelay[1][1], 743);
-
-		AllpassDelay_setDelay(&r->apDelay[2][0], 908);
-		AllpassDelay_setDelay(&r->apDelay[2][1], 523);
-
-		AllpassDelay_setDelay(&r->apDelay[3][0], 2039);
-		AllpassDelay_setDelay(&r->apDelay[3][1], 877);
-
-		VerbModDelay_setModDepth(&r->modDelay[0], 170);
-		VerbModDelay_setModDepth(&r->modDelay[1], 170);
+#include <math.h>
+#include <string.h>
 
 /*
-		for(int i=0;i<4;i++)
+ * Buffer layout (__fp16 samples). Every line is a power-of-two ring that
+ * shares the single write index r->w, so a read at "age" a is
+ * buf[BASE + ((w - a) & MASK)].
+ */
+#define PRE_BASE	0u		// pre-delay + early reflection taps
+#define PRE_MASK	4095u
+#define IAP_BASE	4096u	// 4 input diffusers, 512 each
+#define IAP_MASK	511u
+#define APM0_BASE	6144u	// modulated tank allpasses, 1024 each
+#define APM1_BASE	7168u
+#define APM_MASK	1023u
+#define DEL0_BASE	8192u	// tank delays and allpasses, 2048 each
+#define AP0_BASE	10240u
+#define DEL1_BASE	12288u
+#define DEL2_BASE	14336u
+#define AP1_BASE	16384u
+#define DEL3_BASE	18432u
+#define TANK_MASK	2047u
+#if (DEL3_BASE + TANK_MASK + 1u) != REVERB_BUFFER_SAMPLES
+#error "reverb buffer layout does not match REVERB_BUFFER_SAMPLES"
+#endif
+
+// delay lengths in tank ticks
+#define IAP0_LEN	142u
+#define IAP1_LEN	107u
+#define IAP2_LEN	379u
+#define IAP3_LEN	277u
+#define APM0_LEN	672.f
+#define APM1_LEN	908.f
+#define DEL0_LEN	2047u
+#define AP0_LEN		1800u
+#define DEL1_LEN	1913u
+#define DEL2_LEN	1720u
+#define AP1_LEN		2039u
+#define DEL3_LEN	1163u
+#define LOOP_LEN	(672u + 2047u + 1800u + 1913u + 908u + 1720u + 2039u + 1163u)
+
+#define MOD_DEPTH	8.f		// +- ticks
+#define MOD_RATE	0.8f	// Hz
+#define TWO_PI		6.28318530718f
+
+#define IN_DIFF1	0.75f
+#define IN_DIFF2	0.625f
+#define DECAY_DIFF1	0.7f
+#define DECAY_DIFF2	0.5f
+#define TANK_LIMIT	4.f		// keeps the fp16 lines finite even if something goes wrong
+#define TAP_GAIN	0.6f
+#define WET_GAIN	(1.0f * 32767.f)
+#define ECO_WET_GAIN	1.41f	// compensates the 2:1 input averaging
+#define INPUT_GAIN	(1.f / 65536.f)	// (L+R) -> +-1
+
+#define MAX_CHUNK	64u
+
+static const uint16_t earlyAge[4] = {240, 480, 760, 1000};
+
+#define RD(base, mask, age)		((float)b[(base) + ((w - (age)) & (mask))])
+#define WR(base, mask, v)		(b[(base) + (w & (mask))] = (__fp16)(v))
+
+typedef struct
+{
+	float tank1, tank2, damp1, damp2, toneState;
+	float feedback, dampCoef, toneCoef, toneDry, toneLp, earlyGain;
+	uint32_t preDelay;
+} TankState;
+
+static inline float clampf(float v, float lo, float hi)
+{
+	return fminf(fmaxf(v, lo), hi);
+}
+
+static inline float allpass(__fp16 *b, uint32_t w, uint32_t base, uint32_t mask, uint32_t len, float g, float x)
+{
+	const float d = RD(base, mask, len);
+	const float u = x + g * d;
+	WR(base, mask, u);
+	return d - g * u;
+}
+
+static inline float allpassMod(__fp16 *b, uint32_t w, uint32_t base, float age, float x)
+{
+	const uint32_t i = (uint32_t)age;
+	const float f = age - (float)i;
+	const float a = RD(base, APM_MASK, i);
+	const float c = RD(base, APM_MASK, i + 1u);
+	const float d = a + f * (c - a);
+	const float u = x - DECAY_DIFF1 * d;
+	WR(base, APM_MASK, u);
+	return d + DECAY_DIFF1 * u;
+}
+
+static inline __attribute__((always_inline)) void tick(TankState *s, __fp16 *b, uint32_t w, float x, float modA, float modB, float *outL, float *outR)
+{
+	// input tilt filter + pre-delay
+	s->toneState += s->toneCoef * (x - s->toneState);
+	WR(PRE_BASE, PRE_MASK, s->toneDry * x + s->toneLp * s->toneState);
+
+	const uint32_t pd = s->preDelay;
+	const float pre = RD(PRE_BASE, PRE_MASK, pd);
+	const float early = s->earlyGain * (RD(PRE_BASE, PRE_MASK, pd + earlyAge[0])
+			+ 0.5f * RD(PRE_BASE, PRE_MASK, pd + earlyAge[1])
+			+ 0.125f * RD(PRE_BASE, PRE_MASK, pd + earlyAge[2])
+			+ 0.25f * RD(PRE_BASE, PRE_MASK, pd + earlyAge[3]));
+
+	// two parallel input diffuser pairs -> decorrelated feeds for the tank halves
+	float in1 = allpass(b, w, IAP_BASE + 512u, IAP_MASK, IAP1_LEN, IN_DIFF1, pre);
+	in1 = allpass(b, w, IAP_BASE, IAP_MASK, IAP0_LEN, IN_DIFF1, in1);
+	float in2 = allpass(b, w, IAP_BASE + 1536u, IAP_MASK, IAP3_LEN, IN_DIFF2, pre);
+	in2 = allpass(b, w, IAP_BASE + 1024u, IAP_MASK, IAP2_LEN, IN_DIFF2, in2);
+
+	const float fb = s->feedback;
+
+	// tank half 1
+	float y = allpassMod(b, w, APM0_BASE, APM0_LEN + modA, in1 + s->tank2);
+	WR(DEL0_BASE, TANK_MASK, y);
+	s->damp1 += s->dampCoef * (RD(DEL0_BASE, TANK_MASK, DEL0_LEN) - s->damp1);
+	y = allpass(b, w, AP0_BASE, TANK_MASK, AP0_LEN, DECAY_DIFF2, s->damp1 * fb);
+	WR(DEL1_BASE, TANK_MASK, y);
+	const float t1 = clampf(fb * RD(DEL1_BASE, TANK_MASK, DEL1_LEN), -TANK_LIMIT, TANK_LIMIT);
+
+	// tank half 2
+	y = allpassMod(b, w, APM1_BASE, APM1_LEN + modB, in2 + s->tank1);
+	WR(DEL2_BASE, TANK_MASK, y);
+	s->damp2 += s->dampCoef * (RD(DEL2_BASE, TANK_MASK, DEL2_LEN) - s->damp2);
+	y = allpass(b, w, AP1_BASE, TANK_MASK, AP1_LEN, DECAY_DIFF2, s->damp2 * fb);
+	WR(DEL3_BASE, TANK_MASK, y);
+	const float t2 = clampf(fb * RD(DEL3_BASE, TANK_MASK, DEL3_LEN), -TANK_LIMIT, TANK_LIMIT);
+
+	s->tank1 = t1;
+	s->tank2 = t2;
+
+	// output taps (Dattorro's tap set scaled to these line lengths)
+	const float l = RD(DEL2_BASE, TANK_MASK, 108u) + RD(DEL2_BASE, TANK_MASK, 1213u)
+			- RD(AP1_BASE, TANK_MASK, 1469u) + RD(DEL3_BASE, TANK_MASK, 734u)
+			- RD(DEL0_BASE, TANK_MASK, 915u) - RD(AP0_BASE, TANK_MASK, 187u)
+			- RD(DEL1_BASE, TANK_MASK, 548u);
+	const float r = RD(DEL0_BASE, TANK_MASK, 162u) + RD(DEL0_BASE, TANK_MASK, 1667u)
+			- RD(AP0_BASE, TANK_MASK, 1228u) + RD(DEL1_BASE, TANK_MASK, 1375u)
+			- RD(DEL2_BASE, TANK_MASK, 861u) - RD(AP1_BASE, TANK_MASK, 257u)
+			- RD(DEL3_BASE, TANK_MASK, 44u);
+
+	*outL = TAP_GAIN * l + early;
+	*outR = TAP_GAIN * r + early;
+}
+
+static inline float tickRate(const Reverb *r)
+{
+	return r->type == REVERB_ECO ? REVERB_FS * 0.5f : REVERB_FS;
+}
+
+static float onePoleCoef(float f, float fs)
+{
+	if(f > 0.45f * fs) f = 0.45f * fs;
+	return 1.f - expf(-TWO_PI * f / fs);
+}
+
+static void updatePreDelay(Reverb *r)
+{
+	const float ms = 1.f + 45.f * r->param[0];
+	uint32_t ticks = (uint32_t)(ms * 0.001f * tickRate(r));
+	if(ticks < 1) ticks = 1;
+	if(ticks > TANK_MASK) ticks = TANK_MASK;
+	r->preDelay = ticks;
+}
+
+static void updateDecay(Reverb *r)
+{
+	const float rt60 = 0.3f * powf(64.f, r->param[1]);
+	const float loopSeconds = (float)LOOP_LEN / tickRate(r);
+	// 4 gain stages per loop: fb^4 per loop, -60 dB after rt60
+	float fb = powf(10.f, -0.75f * loopSeconds / rt60);
+	if(fb > 0.98f) fb = 0.98f;
+	r->feedback = fb;
+}
+
+static void updateTone(Reverb *r)
+{
+	const float c = r->param[2];
+	const float fs = tickRate(r);
+	// output = dry*x + lp*lowpass(x): flat at c = 0.5
+	if(c < 0.5f)
+	{
+		const float h = 2.f * c;		// high band gain 0..1
+		r->toneCoef = onePoleCoef(1200.f, fs);
+		r->toneDry = h;
+		r->toneLp = 1.f - h;
+	}
+	else
+	{
+		const float l = 2.f - 2.f * c;	// low band gain 1..0
+		r->toneCoef = onePoleCoef(500.f, fs);
+		r->toneDry = 1.f;
+		r->toneLp = l - 1.f;
+	}
+	r->dampCoef = onePoleCoef(800.f * powf(25.f, c), fs);
+}
+
+static void updateEarly(Reverb *r)
+{
+	r->earlyGain = 0.5f * r->param[3];
+}
+
+// newlib-nano's memset stores single bytes (~3 cycles/byte), too slow for a
+// 40 KB clear in the audio thread. Keep GCC from turning this back into memset.
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((optimize("no-tree-loop-distribute-patterns")))
+#endif
+static void zeroWords(uint32_t *p, uint32_t words)
+{
+	while(words >= 4)
+	{
+		p[0] = 0;
+		p[1] = 0;
+		p[2] = 0;
+		p[3] = 0;
+		p += 4;
+		words -= 4;
+	}
+	while(words--) *p++ = 0;
+}
+
+void Reverb_clear(Reverb *r)
+{
+	zeroWords((uint32_t*)(void*)r->buf, REVERB_BUFFER_SAMPLES * sizeof(__fp16) / 4u);
+	r->tank1 = r->tank2 = 0.f;
+	r->damp1 = r->damp2 = 0.f;
+	r->toneState = 0.f;
+	r->lastL = r->lastR = 0.f;
+	r->clearPending = 0;
+}
+
+void Reverb_init(Reverb *r, __fp16 *buf)
+{
+	memset(r, 0, sizeof(*r));
+	r->buf = buf;
+	r->type = REVERB_OFF;
+	r->param[0] = 0.f;
+	r->param[1] = 0.5f;
+	r->param[2] = 0.5f;
+	r->param[3] = 0.f;
+	updatePreDelay(r);
+	updateDecay(r);
+	updateTone(r);
+	updateEarly(r);
+	r->clearPending = 1;
+}
+
+void Reverb_setPreDelay(Reverb *r, float p)
+{
+	p = clampf(p, 0.f, 1.f);
+	if(p == r->param[0]) return;
+	r->param[0] = p;
+	updatePreDelay(r);
+}
+
+void Reverb_setDecay(Reverb *r, float p)
+{
+	p = clampf(p, 0.f, 1.f);
+	if(p == r->param[1]) return;
+	r->param[1] = p;
+	updateDecay(r);
+}
+
+void Reverb_setTone(Reverb *r, float p)
+{
+	p = clampf(p, 0.f, 1.f);
+	if(p == r->param[2]) return;
+	r->param[2] = p;
+	updateTone(r);
+}
+
+void Reverb_setEarly(Reverb *r, float p)
+{
+	p = clampf(p, 0.f, 1.f);
+	if(p == r->param[3]) return;
+	r->param[3] = p;
+	updateEarly(r);
+}
+
+void Reverb_setType(Reverb *r, uint8_t type)
+{
+	// kit bytes are not range-checked on load: unknown values must not switch
+	// the reverb on
+	if(type >= REVERB_NUM_TYPES) type = REVERB_OFF;
+	if(type == r->type) return;
+	r->type = type;
+	updatePreDelay(r);
+	updateDecay(r);
+	updateTone(r);
+	// line contents were written at the other rate
+	r->clearPending = 1;
+}
+
+static inline int16_t sat16(int32_t v)
+{
+	if(v > 32767) v = 32767;
+	else if(v < -32768) v = -32768;
+	return (int16_t)v;
+}
+
+static inline void mixOut(int16_t *dst, int16_t dry, float wet, float dryWet)
+{
+	const float v = clampf((float)dry + (wet - (float)dry) * dryWet, -32768.f, 32767.f);
+	*dst = sat16((int32_t)*dst + (int32_t)v);
+}
+
+static void processChunk(Reverb *r, const int16_t *in, int16_t *out, uint32_t frames, uint8_t channels, float dryWet)
+{
+	float wetL[MAX_CHUNK];
+	float wetR[MAX_CHUNK];
+
+	TankState s = {
+		r->tank1, r->tank2, r->damp1, r->damp2, r->toneState,
+		r->feedback, r->dampCoef, r->toneCoef, r->toneDry, r->toneLp, r->earlyGain,
+		r->preDelay
+	};
+	__fp16 * const b = r->buf;
+	uint32_t w = r->w;
+
+	// block-rate LFO, linearly ramped across the chunk
+	const uint32_t ticks = r->type == REVERB_ECO ? frames / 2u : frames;
+	r->lfoPhase += TWO_PI * MOD_RATE * (float)frames / REVERB_FS;
+	if(r->lfoPhase > TWO_PI) r->lfoPhase -= TWO_PI;
+	const float targetA = MOD_DEPTH * sinf(r->lfoPhase);
+	const float targetB = MOD_DEPTH * cosf(r->lfoPhase);
+	const float stepA = (targetA - r->modA) / (float)ticks;
+	const float stepB = (targetB - r->modB) / (float)ticks;
+	float modA = r->modA;
+	float modB = r->modB;
+
+	if(r->type == REVERB_ECO)
+	{
+		float lastL = r->lastL;
+		float lastR = r->lastR;
+		for(uint32_t i = 0; i < frames; i += 2)
 		{
-				AllpassDelay_setCoefficient(&r->apDelay[i][0], INITIAL_ALLPASS_COFF);
-				AllpassDelay_setCoefficient(&r->apDelay[i][1], INITIAL_ALLPASS_COFF);
+			const float x = (float)((int32_t)in[2 * i] + in[2 * i + 1] + in[2 * i + 2] + in[2 * i + 3]) * (0.5f * INPUT_GAIN);
+			float l, rr;
+			modA += stepA;
+			modB += stepB;
+			tick(&s, b, w++, x, modA, modB, &l, &rr);
+			wetL[i] = 0.5f * (lastL + l);
+			wetR[i] = 0.5f * (lastR + rr);
+			wetL[i + 1] = l;
+			wetR[i + 1] = rr;
+			lastL = l;
+			lastR = rr;
 		}
-
-		*/
-
-		AllpassDelay_setCoefficient(&r->apDelay[i][0], 0.7);
-		AllpassDelay_setCoefficient(&r->apDelay[i][1], 0.7);
-
-		AllpassDelay_setCoefficient(&r->apDelay[i][0], 0.7);
-		AllpassDelay_setCoefficient(&r->apDelay[i][1], 0.7);
-
-		AllpassDelay_setCoefficient(&r->apDelay[i][0], 0.5);
-		AllpassDelay_setCoefficient(&r->apDelay[i][1], 0.5);
-
-		AllpassDelay_setCoefficient(&r->apDelay[i][0], 0.5);
-		AllpassDelay_setCoefficient(&r->apDelay[i][1], 0.5);
-	    //AllpassDelay_setCoefficient(&r->apDelay[2][1], -INITIAL_ALLPASS_COFF);
-#else
-		VerbDelay_setLength(&r->delay[2], 1720);
-		VerbDelay_setLength(&r->delay[3], 1163); //todo wieso habe ich nur halbe buffer size? größer 4096 geht nicht
-
-		AllpassDelay_setDelay(&r->apDelay[0], 1800);
-		AllpassDelay_setDelay(&r->apDelay[1], 2039);
-
-		AllpassModDelay_setDelay(&r->apModDelay[0], 672);
-		AllpassModDelay_setDelay(&r->apModDelay[1], 908);
-#endif
-
-	    AllpassDelay_setCoefficient(&r->inputAllpass[0], 0.75);
-	    AllpassDelay_setCoefficient(&r->inputAllpass[1], 0.75);
-	    AllpassDelay_setCoefficient(&r->inputAllpass[2], 0.625);
-	    AllpassDelay_setCoefficient(&r->inputAllpass[3], 0.625);
-
-}
-
-
-
-
-//void Reverb_process(Reverb *r, int16_t* input1, int16_t* input2)
-void Reverb_process(Reverb *r, int16_t *fxBuffer,int16_t* outL, int16_t* outR, uint16_t size,  uint8_t channels, float dryWet)
-{
-	int32_t x;
-	int32_t* stereoOut = (int32_t*)outL;
-
-#if !HIGH_RES_SINE_COS
-	 SineCosine_calc(&r->lfo);
-#if SPIN_SEMI
-	 AllpassModDelay_setModValue(&r->modDelay[1], SineCosine_getSine(&r->lfo));
-	 AllpassModDelay_setModValue(&r->modDelay[0], SineCosine_getCosine(&r->lfo));
-#else
-	 VerbModDelay_setModValue(&r->apModDelay[1].delay, SineCosine_getSine(&r->lfo));
-	 VerbModDelay_setModValue(&r->apModDelay[0].delay, SineCosine_getCosine(&r->lfo));
-#endif
-#endif
-	for(uint8_t i=0; i<size;i++)
-	{
-		const uint8_t idx1 = i*2;
-		const uint8_t idx2 = i*2+1;
-
-		const int16_t mix = (__QADD16(fxBuffer[idx1]/2, fxBuffer[idx2]/2));
-		float monoInput = mix/32768.f;
-
-		monoInput = VerbDelay_process(&r->preDelay, monoInput);
-
-		float tmp;
-		float in, in2, out, out2;
-#if USE_OUT_2
-		float out2;
-#endif
-
-#if HIGH_RES_SINE_COS
-		 SineCosine_calc(&r->lfo);
-		 VerbModDelay_setModValue(&r->modDelay[1], SineCosine_getSine(&r->lfo));
-		 VerbModDelay_setModValue(&r->modDelay[0], SineCosine_getCosine(&r->lfo));
-#endif
-
-		 //in = 0.5 * calcOnePole(&r->lpImpulse, AllpassDelay_process(&r->inputAllpass[0],  AllpassDelay_process(&r->inputAllpass[1], AllpassDelay_process(&r->inputAllpass[2], AllpassDelay_process(&r->inputAllpass[3], (monoInput))))));
-
-		 	 //############## early reverb ####################
-
-		 float early = 0;
-		 //float vol = 1;//0.25f;
-		 VerbDelay_process(&r->earlyReflectionDelay, monoInput);
-		 /*
-		 for(int j=0;j<EARLY_TAPS;j++)
-		 {
-		   early += VerbDelay_ReadTap(&r->earlyReflectionDelay, earlyTaps[j]) * vol ;
-		   vol *= 0.5f;
-		 }
-		 */
-		 early += VerbDelay_ReadTap(&r->earlyReflectionDelay, earlyTaps[0]) ;
-		 early += VerbDelay_ReadTap(&r->earlyReflectionDelay, earlyTaps[1]) * 0.5f ;
-		 early += VerbDelay_ReadTap(&r->earlyReflectionDelay, earlyTaps[2]) * 0.125f ;
-		 early += VerbDelay_ReadTap(&r->earlyReflectionDelay, earlyTaps[3]) * 0.25f ;
-
-		 monoInput = 0.5 * TiltEq_process(&r->eq, monoInput);//calcOnePole(&r->lpImpulse, monoInput);
-		 in  = AllpassDelay_process(&r->inputAllpass[0], AllpassDelay_process(&r->inputAllpass[1], (monoInput)));
-		 in2 = AllpassDelay_process(&r->inputAllpass[2], AllpassDelay_process(&r->inputAllpass[3], (monoInput)));
-
-
-
-		 //in = 0.5*lpImpulse.process(inputAllpass[0].process(inputAllpass[1].process(inputAllpass[2].process(inputAllpass[3].process((*input1)<<16)))));
-
-
-
-
-
-
-
-		 //############## Late reverb ####################
-
-#if SPIN_SEMI
-
-		    tmp = AllpassDelay_process(&r->apDelay[0][0], (in + r->lastOut));
-#if !USE_LOWER_DENSITY
-		    tmp = AllpassDelay_process(&r->apDelay[0][1], tmp);
-#endif
-		    tmp = VerbDelay_process(&r->delay[0], tmp);
-
-		    out = tmp;
-
-
-		    //out = __QSUB16((int16_t)(VerbDelay_ReadTap(&r->delay[0], 75)*0.83f),out);
-		    //out = __QADD16((int16_t)(VerbDelay_ReadTap(&r->delay[0], 33)*0.2f),out);
-		    out = (VerbDelay_ReadTap(&r->delay[0], 75)*0.83f) - out;
-		    out = ((VerbDelay_ReadTap(&r->delay[0], 33)*0.2f) + out);
-#if USE_OUT_2
-		    out2 = tmp * 0.1;
-#endif
-
-
-		    tmp = AllpassDelay_process(&r->apDelay[1][0], tmp*r->feedback);
-#if !USE_LOWER_DENSITY
-		    tmp = AllpassDelay_process(&r->apDelay[1][1], tmp);
-#endif
-		    tmp = VerbModDelay_process(&r->modDelay[0], tmp);
-
-		     //out = __QADD16((int16_t)(tmp*0.2f),out);
-		    out = ((tmp*0.67) + out);
-
-
-
-#if USE_OUT_2
-		     out2 = ((tmp*0.2) + out2);
-#endif
-
-
-		    tmp = AllpassDelay_process(&r->apDelay[2][0], (in + tmp*r->feedback));
-#if !USE_LOWER_DENSITY
-		    tmp = AllpassDelay_process(&r->apDelay[2][1], tmp);
-#endif
-		    tmp = VerbDelay_process(&r->delay[1], tmp);
-		    out = ((tmp*0.7f)+out);;
-
-#if USE_OUT_2
-		    out2 = (tmp * 0.5) + out2;
-		    out2 = (VerbDelay_ReadTap(&r->delay[1], 33)*0.7) +out2;
-#endif
-
-
-
-		    tmp = AllpassDelay_process(&r->apDelay[3][0], tmp*r->feedback);
-#if !USE_LOWER_DENSITY
-		    tmp = AllpassDelay_process(&r->apDelay[3][1], tmp);
-#endif
-		    tmp = VerbModDelay_process(&r->modDelay[1], tmp);
-
-		    r->lastOut = calcOnePole(&r->lpFeedback, tmp*r->feedback);
-
-		    out = ((tmp*0.1f) + out);
-
-#if USE_OUT_2
-		    out2 = ((tmp) + out2);;
-		    out2 = ((VerbModDelay_interpolatedReadTap(&r->modDelay[1],17)*0.2) + out2);
-#endif
-
-
-		   // output[0][i] = interpolate(input[0][i],output[0][i],dryWet) + early * earlyMix;
-		   // output[1][i] = interpolate(input[1][i],output[1][i],dryWet) + early * earlyMix;
-		  // return  dryWet*(__QADD16(out*0.5f,out2*0.5f) ) + (1-dryWet)*input;;
-		    //return  (((revItg)(dryWet*(add(out , out2>>1) )))>>16) + (1-dryWet)*input;;
-#if USE_OUT_2
-		    out = (out + out2/2);
-#endif
-
-#if 0
-		  //  r->lastOut = calcOnePole(&r->lpFeedback, tmp*r->feedback);
-#else
-		  //  *input1 =  dryWetMixer(out,*input1,dryWet);
-
-
-		   // return  (((revItg)(dryWet*(add(out , out2) )))>>16) + (1-dryWet)*input;;
-
-	//	   return  dryWet*out + (1-dryWet)*input;
-#endif
-#else
-
-
-
-
-		    //loop 1
-		    // in1 + loop 2 out ->apMod[0]->del[0]-> * fb -> ap[0] -> del[1] * fb --> loop 2
-		    tmp = AllpassModDelay_process(&r->apModDelay[0], (in + r->lastOut2));
-		    tmp = VerbDelay_process(&r->delay[0], tmp);
-
-		    tmp *= r->feedback;
-
-		    tmp = AllpassDelay_process(&r->apDelay[1], (tmp));
-		    tmp = VerbDelay_process(&r->delay[1], tmp);
-
-		     r->lastOut = calcOnePole(&r->lpFeedback, tmp*r->feedback);
-
-
-
-
-
-		    //r->lastOut = tmp * r->feedback;
-
-		    //loop 2
-		    // in2 + loop 1 out ->apMod[1]->del[2]-> * fb -> ap[1] -> del[3] * fb --> loop 1
-		    tmp = AllpassModDelay_process(&r->apModDelay[1], (in2 + r->lastOut));
-			tmp = VerbDelay_process(&r->delay[2], tmp);
-
-			tmp *= r->feedback;
-
-			tmp = AllpassDelay_process(&r->apDelay[1], (tmp));
-			tmp = VerbDelay_process(&r->delay[3], tmp);
-
-			r->lastOut2 = tmp * r->feedback;
-
-		    /*/********* left output, all wet *********
-		     accumulator = 0.6 X node48_54[266]
-		     accumulator += 0.6 x node48_54[2974]
-		     accumulator -= 0.6 X node55_59[1913]
-		     accumulator += 0.6 X node59_63[1996]
-		     accumulator -= 0.6 X node24_30[1990]
-		     accumulator -= 0.6 x node31_33[187]
-		     YL = accumulator - 0.6 X node33_39[1066]
-
-		     ********* right output, all wet *********
-		     ********* accumulator = 0.6 X node24_30[353]
-		     ********* accumulator += 0.6 X node24_30[3627]
-		     ********* accumulator -= 0.6 X node31_33[1228]
-		     ********* accumulator += 0.6 X node33_39[2673]
-		     ********* accumulator -= 0.6 X node48_54[2111]
-		     ********* accumulator -= 0.6 X node55_59[335]
-		     ********* YR = accumulator - 0.6 X node59_63[121] */
-			/*
-			delay[0], 2047);
-			delay[1], 1913);
-			delay[2], 1720);
-			delay[3], 1163);
-
-			apDelay[0], 1800);
-			apDelay[1], 2039);
-
-			apModDelay[0], 672);
-			apModDelay[1], 908);
-			*/
-
-
-
-		    //read output taps
-			out2  = VerbDelay_ReadTapSample(&r->delay[2], 266) * 0.6;
-			//out2 += VerbDelay_ReadTapSample(&r->delay[2], 2046) * 0.6;
-			out2 -= VerbDelay_ReadTapSample(&r->apDelay[1].delay, 1913) * 0.6;
-			out2 += VerbDelay_ReadTapSample(&r->delay[3], 996) * 0.6;
-			//out2 -= VerbDelay_ReadTapSample(&r->delay[0], 1990) * 0.6;
-			out2 -= VerbDelay_ReadTapSample(&r->apDelay[0].delay, 187) * 0.6;
-			out2 -= VerbDelay_ReadTapSample(&r->delay[1], 1066) * 0.6;
-
-			out= TiltEq_process(&r->eqFb,fmaf(early, r->earlyVolume, out2));
-
-#endif
-			int16_t wet =  __SSAT(out*32768, 16);
-			//int16_t wet2 =  __SSAT(out*32768, 16);
-			//int16_t dw = fxBuffer[i] + __SSAT((wet - fxBuffer[i]) * dryWet,16);
-
-			x = __PKHBT(fxBuffer[idx1] + __SSAT((wet - fxBuffer[idx1]) * dryWet,16), fxBuffer[idx2] + __SSAT((wet - fxBuffer[idx2]) * dryWet,16), 16);
-			//LERP dryWet
-			*stereoOut = __QADD16(*stereoOut, x);
-			stereoOut++;
+		r->lastL = lastL;
+		r->lastR = lastR;
 	}
-}
-IN_ITCM_RAM void Reverb_setDelayTime(Reverb *r, float t)
-{
-#if SPIN_SEMI
-	if(r->delayTime != t)
+	else
 	{
-		r->delayTime = t;
-
-		for(int i=0;i<2;i++)
+		for(uint32_t i = 0; i < frames; i++)
 		{
-			VerbDelay_setRoomSize(&r->delay[i], t);
+			const float x = (float)((int32_t)in[2 * i] + in[2 * i + 1]) * INPUT_GAIN;
+			modA += stepA;
+			modB += stepB;
+			tick(&s, b, w++, x, modA, modB, &wetL[i], &wetR[i]);
 		}
-		for(int i=0;i<2;i++)
+	}
+
+	r->modA = targetA;
+	r->modB = targetB;
+	r->w = w;
+	r->tank1 = s.tank1;
+	r->tank2 = s.tank2;
+	r->damp1 = s.damp1;
+	r->damp2 = s.damp2;
+	r->toneState = s.toneState;
+
+	const float gain = r->type == REVERB_ECO ? WET_GAIN * ECO_WET_GAIN : WET_GAIN;
+	if(channels == 2)
+	{
+		for(uint32_t i = 0; i < frames; i++)
 		{
-			VerbModDelay_setRoomSize(&r->modDelay[i], t);
+			mixOut(&out[2 * i], in[2 * i], wetL[i] * gain, dryWet);
+			mixOut(&out[2 * i + 1], in[2 * i + 1], wetR[i] * gain, dryWet);
 		}
-
-		VerbDelay_setRoomSize(&r->earlyReflectionDelay, t);
 	}
-#else
-	/*
-	  	//44 samples = 1ms, 2030 = 46ms
-		VerbDelay_setLength(&r->preDelay, 2031);
-	 */
-	float sz = 0.02166f + t*0.97784342688330871492f;
-	VerbDelay_setRoomSize(&r->preDelay, sz);
-#endif
-}
-
-IN_ITCM_RAM void Reverb_setFeedback(Reverb *r, float fb)
-{
-	r->feedback = fb;//feedbackShaper.shape(fb);
-}
-
-IN_ITCM_RAM void Reverb_setComposition(Reverb *r, float c)
-{
-	TiltEq_setParameter(&r->eq, -1+2*c);
-	TiltEq_setParameter(&r->eqFb, -1+2*c);
-	//compositionParameter = c;
-	setOnePoleCoef(&r->lpFeedback, c);
-//	setOnePoleCoef(&r->lpImpulse, c);
-}
-
-IN_ITCM_RAM void Reverb_setVariation(Reverb *r, float v)
-{
-#if SPIN_SEMI
-	//variationParameter = v;
-	for(int i=0;i<4;i++)
+	else
 	{
-		const float scale = (i+7)/10.f;
-		AllpassDelay_setCoefficient(&r->apDelay[i][0], v*scale);
-		AllpassDelay_setCoefficient(&r->apDelay[i][1], v*scale*0.8);
-		//AllpassDelay_setCoefficient(&r->inputAllpass[i], v*0.9*scale);
-	}
-#else
-	r->earlyVolume = v;
-#endif
-}
-
-
-#if 0
-
-static const float earlyTaps[] =
-{
-		12,
-		24,
-		38,
-		50
-};
-
-AllpassLoopVerb::AllpassLoopVerb()
-{
-	reverbBufferSram = (revItg*)sramBuffer;
-
-
-
-	feedbackShaper.setShape(0.7f);
-	lastOut = 0;
-	lfo.setFreq(1.31f);  //1.18hz
-
-	for(int i=0;i<4;i++)
-	{
-		apDelay[i][0].setBuffer(&reverbBufferSram[i*2*(MAX_ALLPASS_SIZE)]);
-		apDelay[i][1].setBuffer(&reverbBufferSram[(i*2+1)*(MAX_ALLPASS_SIZE)]);
-	}
-	// 8 * MAX_ALLPASS_SIZE occupied
-
-	for(int i=0;i<4;i++)
-	{
-		//TODO could have way less memory -> max delay is 379 samples
-		inputAllpass[i].setBuffer(&reverbBufferSram[8*MAX_ALLPASS_SIZE + i*(MAX_ALLPASS_SIZE)]);
-	}
-	// 12 * MAX_ALLPASS_SIZE occupied
-	for(int i=0;i<2;i++)
-	{
-		delay[i].setBuffer(&reverbBufferSram[12 * MAX_ALLPASS_SIZE + i*MAX_DELAY_SIZE]);
-	}
-	for(int i=0;i<2;i++)
-	{
-		modDelay[i].setBuffer(&reverbBufferSram[14 * MAX_ALLPASS_SIZE + i*MAX_DELAY_SIZE]);
-	}
-
-	earlyReflectionDelay.setBuffer(&reverbBufferSram[16 * MAX_ALLPASS_SIZE]);
-	earlyReflectionDelay.setLength(4000);
-
-	inputAllpass[0].setDelay(142);
-	inputAllpass[1].setDelay(107);
-	inputAllpass[2].setDelay(379);
-	inputAllpass[3].setDelay(277);
-
-	delay[0].setLength(1283);
-	delay[1].setLength(1109); //todo wieso habe ich nur halbe buffer size? größer 4096 geht nicht
-//	delay[1].setLength(3090);
-
-	modDelay[0].setLength(2393);
-	modDelay[1].setLength(5281);
-
-	apDelay[0][0].setDelay(853);
-	apDelay[0][1].setDelay(757);
-
-	apDelay[1][0].setDelay(947);
-	apDelay[1][1].setDelay(743);
-
-	apDelay[2][0].setDelay(953);
-	apDelay[2][1].setDelay(523);
-
-	apDelay[3][0].setDelay(197);
-	apDelay[3][1].setDelay(877);
-
-	modDelay[0].setModDepth(170);
-    modDelay[1].setModDepth(170);
-
-	for(int i=0;i<4;i++)
-	{
-			apDelay[i][0].setCoefficient(INITIAL_ALLPASS_COFF);
-			apDelay[i][1].setCoefficient(INITIAL_ALLPASS_COFF);
-	}
-    apDelay[2][1].setCoefficient(-INITIAL_ALLPASS_COFF);
-
-    inputAllpass[2].setCoefficient(-0.5);
-
-}
-
-void AllpassLoopVerb::setDelayTime(float t)
-{
-	if(delayTime != t)
-	{
-		delayTime = t;
-
-		for(int i=0;i<2;i++)
+		for(uint32_t i = 0; i < frames; i++)
 		{
-			delay[i].setRoomSize(t);
+			mixOut(&out[2 * i], in[2 * i], (wetL[i] + wetR[i]) * (0.5f * gain), dryWet);
 		}
-		for(int i=0;i<2;i++)
-		{
-			modDelay[i].setRoomSize(t);
-		}
-
-		earlyReflectionDelay.setRoomSize(t);
 	}
 }
 
-void AllpassLoopVerb::setComposition(float c)
+void Reverb_process(Reverb *r, const int16_t *fxBuffer, int16_t *out, uint16_t size, uint8_t channels, float dryWet)
 {
-	compositionParameter = c;
-	lpFeedback.setFreq(c);
-	lpImpulse.setFreq(c);
+	if(r->type == REVERB_OFF)
+	{
+		// same as FX_OFF: add the dry bus (mono routing: left bus channel only)
+		const uint32_t step = channels == 2 ? 1u : 2u;
+		for(uint32_t i = 0; i < 2u * size; i += step)
+			out[i] = sat16((int32_t)out[i] + fxBuffer[i]);
+		return;
+	}
+	if(r->clearPending) Reverb_clear(r);
+
+	uint32_t remaining = size & ~1u;
+	while(remaining)
+	{
+		const uint32_t n = remaining > MAX_CHUNK ? MAX_CHUNK : remaining;
+		processChunk(r, fxBuffer, out, n, channels, dryWet);
+		fxBuffer += 2 * n;
+		out += 2 * n;
+		remaining -= n;
+	}
 }
-
-void AllpassLoopVerb::setVariation(float v)
-{
-	variationParameter = v;
-	for(int i=0;i<4;i++)
-		{
-			apDelay[i][0].setCoefficient(v);
-			apDelay[i][1].setCoefficient(v);
-			inputAllpass[i].setCoefficient(v);
-		}
-}
-
-void AllpassLoopVerb::setFeedback(float fb)
-{
-	feedback = feedbackShaper.shape(fb);
-}
-
-
-void AllpassLoopVerb::process(int16_t* input1, int16_t* input2)
-{
-	revItg tmp;
-	revItg in, out, out2;
-
-	 lfo.calc();
-	 modDelay[1].setModValue(lfo.getSine());
-	 modDelay[0].setModValue(lfo.getCosine());
-
-
-
-	 in = 0.5*lpImpulse.process(inputAllpass[0].process(inputAllpass[1].process(inputAllpass[2].process(inputAllpass[3].process((*input1)<<16)))));
-
-
-	 	 //############## early reverb ####################
-
-	 float early = 0;
-	 float vol = 0.25f;
-	 earlyReflectionDelay.process(*input1);
-	 for(int j=0;j<EARLY_TAPS;j++)
-	 {
-	   early += earlyReflectionDelay.ReadTap(earlyTaps[j]) * vol ;
-	   vol *= 0.5f;
-	 }
-
-
-	 //############## Late reverb ####################
-
-	    tmp = apDelay[0][0].process(in + lastOut);
-	    tmp = apDelay[0][1].process(tmp);
-
-	    tmp = delay[0].process(tmp);
-
-	    out = tmp;
-
-	    out = sub((int16_t)(delay[0].ReadTap(75)*0.83f),out);
-	    out = add((int16_t)(delay[0].ReadTap(33)*0.2f),out);
-
-	    out2 = tmp * 0.1;
-
-
-
-	    tmp = apDelay[1][0].process(tmp*feedback);
-	    tmp = apDelay[1][1].process(tmp);
-	    tmp = modDelay[0].process(tmp);
-
-	     out = add((int16_t)(tmp*0.2f),out);
-
-
-	     out2 = add((int16_t)(tmp*0.67),out2);
-
-	    tmp = apDelay[2][0].process(in + tmp*feedback);
-	    tmp = apDelay[2][1].process(tmp);
-	    tmp = delay[1].process(tmp);
-
-	    out2 = add((int16_t)(tmp * 0.5),out2);;
-	    out2 = sub((int16_t)(delay[2].ReadTap(33)*0.7),out2);;
-
-	    out = add((int16_t)(tmp*0.7f),out);;
-
-
-	    tmp = apDelay[3][0].process(tmp*feedback);
-	    tmp = apDelay[3][1].process(tmp);
-	    tmp = modDelay[1].process(tmp);
-
-	    lastOut = lpFeedback.process(tmp*feedback);
-
-	    out = add((int16_t)(tmp*0.1f),out);
-
-
-	    out2 = add((int16_t)(tmp),out2);;
-	    out2 = add((int16_t)(modDelay[1].interpolatedReadTap(17)*0.2),out2);
-
-
-
-	   // output[0][i] = interpolate(input[0][i],output[0][i],dryWet) + early * earlyMix;
-	   // output[1][i] = interpolate(input[1][i],output[1][i],dryWet) + early * earlyMix;
-	  // return  dryWet*(__QADD16(out*0.5f,out2*0.5f) ) + (1-dryWet)*input;;
-	    //return  (((revItg)(dryWet*(add(out , out2>>1) )))>>16) + (1-dryWet)*input;;
-
-	    out = (add(out , out2>>1)>>16);
-
-	    *input1 =  dryWetMixer(out,*input1,dryWet);
-
-
-	   // return  (((revItg)(dryWet*(add(out , out2) )))>>16) + (1-dryWet)*input;;
-
-//	   return  dryWet*out + (1-dryWet)*input;
-
-}
-
-#endif

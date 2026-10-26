@@ -1,8 +1,8 @@
 # Audio CPU meter and performance
 
 The firmware measures how much of the available time the audio render uses.
-This is the headroom left for new engines and effects (for example the plate
-reverb in [backlog.md](backlog.md)). This page describes what is measured, how
+This is the headroom left for new engines and effects (for example the
+[plate reverb](reverb.md)). This page describes what is measured, how
 to read it, and holds the numbers measured on hardware.
 
 ## What is measured
@@ -23,7 +23,7 @@ cycle counter is read around that call, and the result is accounted in
 | **peak** (`pk`) | Worst single block since boot or the last reset |
 | **voices** (`vce`) | LFOs, modulation, voice parameter updates and the six voice renders |
 | **mixer** (`mix`) | Buffer clears, per-voice decimation, pan and output routing |
-| **fx** (`fx`) | `FxBus_process` (distortion, ring, compressor, delay) |
+| **fx** (`fx`) | `FxBus_process` (distortion, ring, compressor, delay, reverb), including the one-off buffer clear when the FX type changes |
 | **xruns** (`xrn`) | Underruns: the DAC wanted a new block but the previous one had not been rendered yet. Saturates at 16383 |
 
 Notes:
@@ -118,6 +118,33 @@ with the current sync settings. FX-specific, 300 BPM and SD-save loads remain
 to be measured.
 
 Firmware: `2f179b5` · Image SHA-256: `46b8f317…` · Date: 2026-10-25 · Kit: `TKit1` (slot 16)
+
+## Plate reverb
+
+The reverb ([reverb.md](reverb.md)) is counted in **fx**. The figures below
+are estimates from the disassembly of the release build (GCC 15.3, `-O3`), and
+are to be replaced with hardware measurements.
+
+| Reverb type | Instructions | Estimated cycles / block | Estimated fx % |
+|-------------|-------------|--------------------------|----------------|
+| `off` (dry passthrough) | ≈4 per sample | ≈0.6 k | ≈0.2 (same as FX off) |
+| `Plt` | 348 per frame (tank) + ≈30 (dry/wet mix) | 24–31 k | **≈8–10** |
+| `Eco` | 365 per 2 frames + ≈30 per frame | 14–18 k | **≈4.5–6** |
+| Selecting the reverb or changing its type (once) | 40 KB clear | ≈10 k | +3 in that block |
+| Reverb → delay switch (once) | 64 KB clear | ≈16 k | +5 in that block |
+| Delay → reverb switch (once) | 64 KB + 40 KB clear | ≈26 k | +8 in that block |
+
+Cycles assume 1.0–1.3 cycles per instruction (Cortex-M7 dual issue; code in
+flash behind the I-cache, delay lines and state in DTCM). The LFO's
+`sinf`/`cosf` once per block add ≈0.1 %. With the measured steady load of
+57–60 %, `Plt` should end up at ≈66–70 %.
+
+| Scenario | now % | peak % | voices % | mixer % | fx % | xruns |
+|----------|------:|-------:|---------:|--------:|-----:|------:|
+| Kit with FX `rev`, type `off` | | | | | | |
+| Kit with FX `rev`, type `Plt`, all voices to FX bus | | | | | | |
+| Kit with FX `rev`, type `Eco`, all voices to FX bus | | | | | | |
+| Switching FX type delay ↔ rev repeatedly (peak, xruns) | | | | | | |
 
 ## Hardware test checklist
 

@@ -71,8 +71,10 @@ The version in the file name, and on the LXR's start-up screen, is set by `proje
 [CMakeLists.txt](CMakeLists.txt). Builds of this fork add the suffix `-sx` (`LXR_FW_SUFFIX`), for the
 SysEx protocol described in [docs/sysex.md](docs/sysex.md).
 
-The SysEx codec and the CPU meter have host-side unit tests that run on your computer:
-`make -C tests/host` and `python3 tools/test_lxr_status.py`.
+The SysEx codec, the CPU meter and the plate reverb have host-side unit tests that run on your
+computer: `make -C tests/host` and `python3 tools/test_lxr_status.py`.
+
+The FX bus has a plate reverb as FX type `rev`. See [docs/reverb.md](docs/reverb.md).
 
 The global menu shows the audio CPU load. It can also be read over SysEx with `tools/lxr_status.py`.
 See [docs/performance.md](docs/performance.md).

@@ -3,7 +3,7 @@
  "format_version": 1,
  "firmware": {
   "base": "Erica Synths LXR-02 v1.7",
-  "source_commit": "a43cd4fcda23ec3d577dc425261c3eb28bd5abff"
+  "source_commit": "1216aaeec4059d8b0c335e4ecbd066898500c602"
  },
  "counts": {
   "NUM_PARAMS": 305,
@@ -262,7 +262,8 @@
     "drv",
     "rng",
     "cmp",
-    "del"
+    "del",
+    "rev"
    ]
   },
   "19": {
@@ -294,7 +295,9 @@
   "22": {
    "symbol": "MENU_REVERB",
    "labels": [
-    "Plt"
+    "off",
+    "Plt",
+    "Eco"
    ]
   },
   "23": {
@@ -10137,14 +10140,15 @@
    },
    "dtype": "MENU",
    "min": 0,
-   "max": 4,
+   "max": 5,
    "menu": "MENU_FX",
    "labels": [
     "off",
     "drv",
     "rng",
     "cmp",
-    "del"
+    "del",
+    "rev"
    ],
    "ui": [
     {
@@ -10713,10 +10717,12 @@
    },
    "dtype": "MENU",
    "min": 0,
-   "max": 0,
+   "max": 2,
    "menu": "MENU_REVERB",
    "labels": [
-    "Plt"
+    "off",
+    "Plt",
+    "Eco"
    ],
    "ui": [
     {

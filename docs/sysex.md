@@ -294,8 +294,8 @@ Host → device:
   greater than 247, the extra values are ignored.
 * Values are stored **byte-exact**, exactly like loading the `.snd` file from
   SD: they are **not** clamped to the front-panel range (factory kits contain
-  such values, e.g. hi-hat transient wave 24 or 89, FX type 5, and clamping
-  would change how they sound). The only change is the one the SD loader also
+  such values, e.g. hi-hat transient wave 24 or 89, and clamping would change
+  how they sound). The only change is the one the SD loader also
   makes: a velocity or LFO modulation target (`PAR_VEL_DEST_1`–`6`,
   `PAR_TARGET_LFO1`–`6`) that is beyond the device's target table becomes 0.
   A later `KIT_REQUEST` therefore returns the same bytes that were sent,
@@ -491,6 +491,11 @@ They are listed with ranges, labels and scopes in `params.json`:
 Modulation destinations (`PAR_VEL_DEST_*`, `PAR_TARGET_LFO*`,
 `PAR_P1_DEST`/`PAR_P2_DEST`) hold an **index into `mod_targets`** in
 `params.json`, not a parameter id.
+
+Ranges can grow between builds without new ids. With the plate reverb
+([reverb.md](reverb.md)), `PAR_FX_TYPE` (234) accepts 0–5 (5 = `rev`) and
+`PAR_FX_REVERB_TYPE` (244) accepts 0–2 (`off`/`Plt`/`Eco`). Stock v1.7 accepts
+0–4 and 0. Use the `max` from the matching `params.json`.
 
 ## 7. Parameter echo (device → host notifications)
 
