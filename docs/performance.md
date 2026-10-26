@@ -178,11 +178,36 @@ controls, FX settings and routing, were restored to the edit buffer and
 independently verified with `PARAM_GET`: FX off, all routes direct and all
 three FM engines set to `old`. No save or SD write was performed.
 
+### Feedback-FM with engaged freeze
+
+A further five-minute run used the same kit, pattern, sequencer state,
+seven-channel 16th-note workload and three FM settings. All six sound voices
+were routed to FX in the live edit buffer. FX was `frz`, dry/wet 100, and
+P1–P4 = 64/64/127/127. Freeze was engaged at 1/16 (`FX_FREEZE` value 5) and
+held throughout the workload, then released. The CPU meter was reset before
+the run and sampled every 30 seconds:
+
+| Time | now % | peak % | voices % | fx % | xruns |
+|-----:|------:|-------:|---------:|-----:|------:|
+| 30–270 s | 61.9 | 64.7–64.8 | 53.1 | 3.5 | 0 |
+| 300 s | 61.9 | 64.8 | 53.1 | 3.5 | 0 |
+
+The original values of all 28 captured edit-buffer parameters, including FM,
+FX and routing, were restored and verified exactly with `PARAM_GET`. The kit
+remained slot 16 (`TKit1`); no save or SD write was performed.
+
+This establishes a five-minute CPU result only for continuously engaged 1/16
+freeze with these settings. No audio was captured or auditioned; clicks,
+timing and audibility were not checked. Other freeze lengths, pitch, gate,
+tape-stop, clock behavior and FX switching remain untested.
+
 These are measured five-minute operating conditions, not full hardware
-acceptance. No audio was captured or auditioned, and these runs do not cover
-FM extremes, DC/clipping/retrigger/choke/morph or save/reload behavior, freeze
-steady-state performance, modulation/UI/MIDI/SD switching, or sequencer
-condition and beat-repeat behavior. Those checks remain pending in the
+acceptance. No audio was captured or auditioned, and the runs do not cover FM
+extremes, DC/clipping/retrigger/choke/morph or save/reload behavior, other
+freeze settings and switching, modulation/UI/MIDI/SD switching, or actual
+sequencer condition cycling and beat-repeat playback. The condition and
+beat-repeat protocol operations below were exercised, but do not validate
+playback behavior. Remaining checks are pending in the
 [feedback-FM hardware acceptance checklist](feedback-fm.md#hardware-acceptance-checklist)
 and the checklist below.
 
@@ -205,6 +230,22 @@ Conditions add 168 bytes per pattern (10,752 bytes across 64 patterns), a
 unchanged; general RAM is 73.75% used. Existing ITCM sequencer functions grow
 to 97.17% utilization overall, leaving only **464 bytes** of ITCM headroom.
 Further sequencer changes must be checked against this tight limit.
+
+### Hardware protocol checks
+
+With the sequencer stopped, seven different condition values (1–7) were
+temporarily set on the first seven steps of active pattern 2 using
+`CONDITION_SET` for slot `0x7F` with `SAVE=0`. `CONDITION_DUMP` returned the
+exact 168-byte buffer. The original all-zero condition buffer was restored
+byte-exactly; no `SAVE` was issued. This verifies protocol write/dump/restore,
+not condition evaluation during playback.
+
+`SEQ_BEAT_REPEAT` was exercised in active and release forms at all four rates
+while the sequencer was stopped. Commands returned without NAK and were
+explicitly released. Host MIDI Start followed by four beats of 120 BPM clock
+did not change device status from stopped with the current sync settings.
+Therefore actual sequencer playback, condition cycling and audible beat-repeat
+behavior were not verified.
 
 The release build produces `build/release/LXR_V2_V1.7-sx.img`: **316,136 bytes**
 including its 16-byte update header (316,120-byte firmware payload), SHA-256
@@ -289,11 +330,12 @@ The freeze / beat repeat ([freeze.md](freeze.md)) is counted in **fx**.
 
 ### Measured
 
-The full freeze workload below remains to be measured on hardware, with the
-same setup as the reverb rows above (kit `TKit1`, 7 voices on 16ths at 120 BPM,
-counters reset for each row), FX type `frz`, `d/w` 100, P1–P4 = 64/64/127/127
-(1/16, original pitch, no decay, no gate). "Engaged" rows: hold perf step 13
-(1/16) for the whole window.
+One five-minute engaged-freeze workload with all three feedback-FM engines is
+measured below. The other freeze scenarios remain to be measured on hardware,
+using the same setup as the reverb rows above (kit `TKit1`, 7 voices on 16ths
+at 120 BPM, counters reset for each row), FX type `frz`, `d/w` 100, P1–P4 =
+64/64/127/127 (1/16, original pitch, no decay, no gate). "Engaged" rows: hold
+perf step 13 (1/16) for the whole window.
 
 #### Exploratory 30-second freeze-path check
 
@@ -316,7 +358,7 @@ hardware acceptance checks below.
 | Setting | now % | peak % | voices % | mixer % | fx % | xruns |
 |---------|------:|-------:|---------:|--------:|-----:|------:|
 | FX `frz`, not engaged | | | | | | |
-| FX `frz`, engaged 1/16, FX output stereo | | | | | | |
+| FX `frz`, engaged 1/16, three FM engines, all voices routed to FX (5 min) | 61.9 | 64.7–64.8 | 53.1 | — | 3.5 | 0 |
 | FX `frz`, engaged 1/32T (most crossfades), stereo | | | | | | |
 | FX `frz`, engaged 1/16, `pit` 127 (tape stop) | | | | | | |
 | FX `frz`, engaged 1/4, FX output mono (single output) | | | | | | |
@@ -327,6 +369,10 @@ hardware acceptance checks below.
 | FX type `frz` ↔ `rev` (type `Plt`), 20 switches 150 ms apart | | |
 
 Firmware: · Image SHA-256: · Date: · Kit:
+
+The five-minute 1/16 row meets the performance-duration check for this
+specific workload only. Listening/clicks, other pitch/gate/tape-stop settings,
+clock behavior and switching remain untested.
 
 ### Estimate from the code
 
